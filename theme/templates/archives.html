@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Article Archives</h2>
+
+    <ul class="article-list">
+        {% for article in dates %}
+        <li>
+            <time datetime="{{ article.date }}">{{ article.date|strftime('%Y-%m-%d') }}</time>
+            <a class="article" href="{{ SITEURL }}/{{ article.url }}">
+                {{ article.title|striptags }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

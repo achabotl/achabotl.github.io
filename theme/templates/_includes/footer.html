@@ -1,0 +1,14 @@
+<span id="left-footer">
+    &copy; 2018<script>new Date().getFullYear()>2018&&document.write("-"+new Date().getFullYear());</script>, {{ AUTHOR }}
+</span>
+<span id="right-footer">
+    {% if TWITTER_USERNAME %}
+        <a href="https://twitter.com/{{ TWITTER_USERNAME }}">Twitter</a>
+    {% endif %}
+    
+    {% if GITHUB_USERNAME %}
+        <a href="https://github.com/{{ GITHUB_USERNAME }}">GitHub</a>
+    {% endif %}
+
+<a href="{{SITE_URL}}/feeds/atom.xml">RSS</a>
+</span>

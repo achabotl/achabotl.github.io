@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+{% if articles %}
+    {% for article in articles_page.object_list %}
+            {% include '_includes/article_content.html' %}
+            {% if not loop.last%}
+            <hr>
+            {% endif %}
+    {% endfor %}
+{% endif %}
+
+{% if articles_page.has_other_pages() %}
+    {% include 'pagination.html' %}
+{% endif %}
+
+{% endblock %}

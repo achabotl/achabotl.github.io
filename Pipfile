@@ -1,0 +1,30 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+"beautifulsoup4" = "==4.6.0"
+blinker = "==1.4"
+docutils = "==0.14"
+feedgenerator = "==1.9"
+pelican = "==3.7.1"
+python-dateutil = "==2.6.1"
+pytz = "==2017.3"
+six = "==1.11.0"
+smartypants = "==2.0.0"
+typogrify = "==2.0.7"
+"Jinja2" = "==2.9.6"
+Markdown = "==2.6.9"
+MarkupSafe = "==1.0"
+Pygments = "==2.2.0"
+Unidecode = "==0.4.21"
+pelican-minify = "*"
+webassets = "*"
+cssmin = "*"
+cssutils = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"
