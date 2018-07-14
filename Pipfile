@@ -23,6 +23,7 @@ pelican-minify = "*"
 webassets = "*"
 cssmin = "*"
 cssutils = "*"
+ghp-import = "*"
 
 [dev-packages]
 
