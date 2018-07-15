@@ -1,0 +1,171 @@
+/* ====================================
+ * Basic stuff
+ * ==================================== */
+
+body {
+    background-color: #fafafa;
+    font-family: "Georgia", sans-serif;
+    color: #444;
+    font-size: 16px;
+}
+
+#main {
+    max-width: 600px;
+    /*Center*/
+    margin: 0px auto 0px auto;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+p {
+    line-height: 1.5;
+}
+
+h1, h2, h3, h4 {
+    line-height: 1.2;
+}
+
+h1 + p, h2 + p, h3 + p, h4 + p {
+    margin-top: -15px;
+}
+
+h1 {
+    font-size: 2em;
+}
+
+h2 {
+    font-size:1.2em;
+}
+
+h3 {
+    font-size:1em;
+}
+
+article img {
+    max-width: 100%;
+}
+
+article a {
+    text-decoration: underline;
+}
+
+pre {
+    padding: 0px 15px;
+    width: calc(100% - 30px); /* Cancels out the left/right paddings */
+    font-size: 0.9em;
+    overflow-x: auto;
+}
+
+blockquote {
+  margin-left: 0px;
+  margin-right: 0px;
+  padding-left: 15px;
+  padding-right: 15px;
+  border-left: 5px solid #0e84b5;
+} 
+
+.article-title {
+    margin-top: 40px;
+    margin-bottom: 0px;
+}
+
+.article-title a {
+    text-decoration: none;
+    
+}
+
+.meta {
+    color: #999;
+}
+
+/* ====================================
+ * Navbar
+ * ==================================== */
+
+.navbar {
+    padding: 0px 0px;
+    margin: -3px 0px 5px 0px;
+}
+
+.navbar > li {
+    display: inline;
+    list-style-type: none;
+    margin: 0.25em;
+}
+
+#left-navbar {
+    float: left;
+}
+
+#right-navbar {
+    float: right;
+}
+
+#hr-nav {
+    clear: both;
+}
+
+/* ====================================
+ * Header
+ * ==================================== */
+
+#site-name {
+    margin-bottom: 0px;
+    font-size: 2em;
+}
+
+/* ====================================
+ * Footer
+ * ==================================== */
+
+footer {
+    font-size: 0.75em;
+    display:flex;
+/*    flex-direction:row;*/
+    justify-content:space-between;
+}
+
+#left-footer {
+    float: left;
+}
+
+#right-footer {
+    float: right;
+}
+
+#right-footer a {
+    margin-left: 10px;
+}
+
+/* ====================================
+ * Tables
+ * ====================================*/
+table {
+    width: auto;
+    max-width: 100%;
+    margin-left: auto;  /* center the table */
+    margin-right: auto;
+    border-spacing: 0px;
+    border-top: 2px solid #333333;
+    border-bottom: 2px solid #333333; 
+    overflow-x: auto;
+}
+
+th { 
+    border-bottom: 1px solid #333333;
+    padding: 0.65ex 0.5em 0.4ex 0.5em;
+    font-weight: normal;
+}
+
+tbody tr:first-child td {
+    /* add 0.65ex space between thead row and tbody */
+    padding-top: 0.65ex; 
+}
+
+td { 
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+}

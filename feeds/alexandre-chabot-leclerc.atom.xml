@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Shredded Bits - Alexandre Chabot-Leclerc</title><link href="http://localhost:8000/" rel="alternate"></link><link href="http://localhost:8000/feeds/alexandre-chabot-leclerc.atom.xml" rel="self"></link><id>http://localhost:8000/</id><updated>2018-07-14T00:00:00-05:00</updated><entry><title>Manually Merging Day One Journals</title><link href="http://localhost:8000/2018/07/14/manually-merging-day-one-journals/" rel="alternate"></link><published>2018-07-14T00:00:00-05:00</published><updated>2018-07-14T00:00:00-05:00</updated><author><name>Alexandre Chabot-Leclerc</name></author><id>tag:localhost,2018-07-14:/2018/07/14/manually-merging-day-one-journals/</id><summary type="html"></summary><content type="html">&lt;p&gt;My first Day One entry is from January 24, 2012. I used it often to take
+note about what I was doing during my PhD with the &lt;code&gt;#wwid&lt;/code&gt; tag (what was I
+doing, an idea from &lt;a href="http://brettterpstra.com/"&gt;Brett Terpstra&lt;/a&gt;, I think), and
+sometimes to clarify some&amp;nbsp;thoughts.&lt;/p&gt;
+&lt;p&gt;When Day One went The Way of the Subscription, I didn&amp;#8217;t bother too much
+because Dropbox sync still worked. Until it didn&amp;#8217;t. I somehow didn&amp;#8217;t realized
+it and kept adding entries to both the iOS &lt;em&gt;and&lt;/em&gt; the macOS versions. Not
+good. It&amp;#8217;s been on my to do list for a while to find a way to merge the two
+journals. I could probably subscribe to the Day One sync service and have it
+figure out the merging but I didn&amp;#8217;t want to subscribe just for&amp;nbsp;that.&lt;/p&gt;
+&lt;p&gt;I learned somewhere that Day One 2 could export journals as a folder of photos
+and a &lt;span class="caps"&gt;JSON&lt;/span&gt; file. I figure I could probably write a script to do the merging.
+So I downloaded Day One 2 on my iPhone and Mac, imported my Day One Classic
+journals, exported them as &lt;span class="caps"&gt;JSON&lt;/span&gt; to a folder on my Mac, and unzipped them. I
+also created a &lt;code&gt;merged/&lt;/code&gt; folder where to put the merged journal. The hierarchy
+looks like&amp;nbsp;this:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;$ tree -L &lt;span class="m"&gt;2&lt;/span&gt;
+.
+├── Journal-JSON-ios/
+│   ├── Journal.json
+│   └── photos/
+├── Journal-JSON-ios.zip
+├── Journal-JSON-mac/
+│   ├── Journal.json
+│   └── photos/
+├── Journal-JSON-mac.zip
+├── merge_journals.py
+└── merged/
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;I first copied the photo folder from &lt;code&gt;Journal-JSON-ios/&lt;/code&gt; to &lt;code&gt;merged/&lt;/code&gt;
+and the photos from &lt;code&gt;Journal-JSON-mac/photos/&lt;/code&gt;. I was pretty confident
+that I would end up with the union of all the photos because Day One uses
+&lt;a href="https://en.wikipedia.org/wiki/Universally_unique_identifier"&gt;UUIDs&lt;/a&gt; to
+identify each photo. The &lt;code&gt;-n&lt;/code&gt; option to &lt;code&gt;cp&lt;/code&gt; prevents overwriting&amp;nbsp;files.&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;$ cp -r Journal-JSON-ios/photos merged/
+$ cp -n Journal-JSON-mac/photos merged/photos/
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;I then ran the &lt;code&gt;merge_journals.py&lt;/code&gt; script (below) to do a similar merge of the
+entries, based on the UUIDs. The merging happens by building a dictionary with
+&lt;span class="caps"&gt;UUID&lt;/span&gt; of each entry as the key and the entry itself as the value. It&amp;#8217;s two
+loops over the iOS and the macOS entries. Entries with the same &lt;span class="caps"&gt;UUID&lt;/span&gt; should
+have the same contents, unless I&amp;#8217;ve edited some metadata on one platform but
+not the other. I&amp;#8217;m not too worried about&amp;nbsp;that.&lt;/p&gt;
+&lt;p&gt;The output dictionary will be written to the &lt;code&gt;Journal.json&lt;/code&gt; file. The entries
+are sorted chronologically because that&amp;#8217;s how it was in the exported journal
+files, but I doubt it&amp;nbsp;matters.&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;output&lt;/code&gt; dictionary is written to disk without enforcing the conversion to
+&lt;span class="caps"&gt;ASCII&lt;/span&gt; since the exported journals are encoded using &lt;span class="caps"&gt;UTF&lt;/span&gt;-8. The indent is there
+to make the output more readable and diff-able with the exported&amp;nbsp;journals.&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="nn"&gt;json&lt;/span&gt;
+
+&lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="nb"&gt;open&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;./Journal-JSON-ios/Journal.json&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="n"&gt;ios&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;json&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;load&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="nb"&gt;open&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;./Journal-JSON-mac/Journal.json&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="n"&gt;mac&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;json&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;load&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+
+&lt;span class="c1"&gt;# Extract and merge UUIDs&lt;/span&gt;
+&lt;span class="n"&gt;uniques&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;&lt;span class="n"&gt;entry&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;uuid&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]:&lt;/span&gt; &lt;span class="n"&gt;entry&lt;/span&gt; &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;entry&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;ios&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;entries&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]}&lt;/span&gt;
+&lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="n"&gt;entry&lt;/span&gt; &lt;span class="ow"&gt;in&lt;/span&gt; &lt;span class="n"&gt;mac&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;entries&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]:&lt;/span&gt;
+    &lt;span class="n"&gt;uniques&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;entry&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;uuid&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;entry&lt;/span&gt;
+
+&lt;span class="c1"&gt;# Create the output JSON data structure&lt;/span&gt;
+&lt;span class="n"&gt;output&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{}&lt;/span&gt;
+&lt;span class="n"&gt;output&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;metadata&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;mac&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;metadata&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;
+&lt;span class="n"&gt;output&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;entries&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;list&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;uniques&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;values&lt;/span&gt;&lt;span class="p"&gt;())&lt;/span&gt;
+&lt;span class="c1"&gt;# I&amp;#39;m not sure it matters, but Day One usually exports the entries&lt;/span&gt;
+&lt;span class="c1"&gt;# in chronological order&lt;/span&gt;
+&lt;span class="n"&gt;output&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;entries&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;sort&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;key&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="k"&gt;lambda&lt;/span&gt; &lt;span class="n"&gt;e&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="n"&gt;e&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;creationDate&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;])&lt;/span&gt;
+
+&lt;span class="c1"&gt;# ensure_ascii print unicode characters as-is.&lt;/span&gt;
+&lt;span class="k"&gt;with&lt;/span&gt; &lt;span class="nb"&gt;open&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;merged/Journal.json&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s1"&gt;&amp;#39;w&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;encoding&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;utf-8&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="k"&gt;as&lt;/span&gt; &lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt;
+    &lt;span class="n"&gt;json&lt;/span&gt;&lt;span class="o"&gt;.&lt;/span&gt;&lt;span class="n"&gt;dump&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;output&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;f&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;indent&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;True&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;ensure_ascii&lt;/span&gt;&lt;span class="o"&gt;=&lt;/span&gt;&lt;span class="bp"&gt;False&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;The last step is to zip the journal and photos together, which tripped me up
+a few times. The &lt;code&gt;Journal.json&lt;/code&gt; and the &lt;code&gt;photos/&lt;/code&gt; folder must be at the top
+level of the archive, so I zip the file from within the &lt;code&gt;merged/&lt;/code&gt; folder and
+then move it back up one&amp;nbsp;level.&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;$ &lt;span class="nb"&gt;cd&lt;/span&gt; merged
+$ zip -r merged.zip *
+$ mv merged.zip ..
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;I could then import &lt;code&gt;merged.zip&lt;/code&gt; in Day One, which created a new Journal, and
+delete the old&amp;nbsp;one.&lt;/p&gt;
+&lt;p&gt;I guess I could somewhat automate this to roll my own, &lt;span class="caps"&gt;DIY&lt;/span&gt;, sync between
+versions of Day One, but I&amp;#8217;d rather pay them money once I decide to use Day
+One frequently again. Still, I really appreciate that the Day One developers
+picked formats that could be manipulated so&amp;nbsp;easily.&lt;/p&gt;</content><category term="python"></category></entry></feed>
