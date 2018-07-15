@@ -1,1 +1,1 @@
-Content for [alexchabot.net](https://alexchabot.net).
+Contents of [alexchabot.net](https://alexchabot.net).
