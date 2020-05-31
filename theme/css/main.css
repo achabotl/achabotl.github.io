@@ -5,7 +5,7 @@
 body {
     background-color: #fafafa;
     font-family: "Georgia", sans-serif;
-    color: #444;
+    color: #000;
     font-size: 16px;
 }
 
@@ -20,7 +20,7 @@ a {
     text-decoration: none;
 }
 
-p {
+article {
     line-height: 1.5;
 }
 
@@ -57,6 +57,7 @@ pre {
     width: calc(100% - 30px); /* Cancels out the left/right paddings */
     font-size: 0.9em;
     overflow-x: auto;
+	line-height: 1;
 }
 
 blockquote {

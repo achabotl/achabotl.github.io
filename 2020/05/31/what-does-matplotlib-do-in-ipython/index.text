@@ -1,0 +1,69 @@
+Title: What does %matplotlib do in IPython
+status: published
+Date: 2020-05-31
+Keywords: python
+
+
+
+_TLDR; Use `%matplotlib` if you want interactive plotting with matplotlib. If you're only interested in the GUI's event loop, `%gui <backend>` is sufficient._
+
+I never really understood the difference between `%gui` and `%matplotlib` in IPython. One of my colleagues at Enthought once told me that at some point in his career, he more or less stopped reading documentation and instead went straight to the code. That's what I did here. But let's do a bit of history first.
+
+In the "beginning", there was `pylab`. It (still) is a module of matplotlib and was a flag to IPython designed to [facilitate the adoption of Python as a numerical computing language](https://web.archive.org/web/20130609145008/https://wiki.scipy.org/PyLab) by providing a MATLAB-like syntax.[^matlab] The reference was so explicit that before being renamed to `pylab` on [Dec 9, 2004](https://github.com/matplotlib/matplotlib/commit/f210efb0aff44a108239496c877aefe6b7cab2e5), the module was called `matplotlib.matlab`. IPython adopted the rename on the [same day](https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R616).[^pylab] With the `‑‑pylab` flag or the `%pylab` magic function, IPython would set up matplotlib for interactive plotting and executed a number of imports from IPython, NumPy and matplotlib. Even thought it helped a few people transition to Python (including myself), it turned out to be a pretty bad idea from a usability point of view. Matthias Bussonnier wrote up a good list of the many things that are wrong with it in "[No Pylab Thanks](https://matthiasbussonnier.com/posts/10-No-PyLab-Thanks.html)."
+
+[^matlab]: Basically, no namespaces, and direct access to functions like `plot`, `figure`, `subplot`, etc.
+
+[^pylab]: The earliest commit I found for the IPyhon project was on July 6, 2005 by Fernando Perez, 7 months after the name change. Its Git hash is [6f629fcc23ba63342548f61cc7307eeef4f55799](https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799). But the earliest mention is an [August 2004 entry in the ChangeLog](https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R955): "ipythonrc-pylab: Add matplotlib support," which is _before_ the offical rename in matplotlib.
+
+For the 1.0.0 release of IPython in August 2013, all mentions of `%pylab` were removed from the examples (in a [July 18, 2013](https://github.com/ipython/ipython/pull/3683) commit) and were replaced by calls to the `%matplotlib` magic function, which only enables interactive plotting but does not perform any imports. The `%matplotlib` function had already been introduced in a [2013 refactoring](https://github.com/ipython/ipython/commit/7ae1fe4225c0c11ccdd6eec758c23aa81ac88654) to separate the interatice plotting from the imports. The `%gui` magic command had already been [introduced](https://github.com/ipython/ipython/commit/a38045e05d22fee06a56ae884856ed689523ff7b) in 2009 by Brian Granger to "manage the events loops" (hint hint).
+
+Now we know that the (my) confusion with `%gui` and `%matplotlib` started in 2013. 
+
+This analysis refers to [IPython 7.8.0](https://github.com/ipython/ipython/tree/7.8.0) and [ipykernel 5.1.2](https://github.com/ipython/ipykernel/tree/v5.1.2).
+
+Our entry point will be the `%matplotlib` magic command. Its source code is in the [`IPython.core.pylab.py`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/magics/pylab.py#L46-L100) file. The essential call is to `shell.enable_matplotlib(gui)`, which is itself implemented in [`IPython.core.interactiveshell.InteractiveShell`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/interactiveshell.py#L3380-L3423), and does five things:
+
+1. **Select the "backend" given the choice of GUI event loop.** This is done by calling [`IPython.core.pylabtools.find_gui_and_backend(gui)`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L259-L299). It encapsulates the logic to go
+from a GUI name, like `"qt5"` or `"tk"`, to a backend name, like `"Qt5Agg"` and  `"TkAgg"`.
+2. **Activate matplotlib for interactive use** by calling [`IPython.core.pylabtools.activate_matplotlib(backend)`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L302-L323), which:
+	 1. Activates the interactive mode with `matplotlib.interactive(True)`; 
+	 2. Switches to the  new backend with `matplotlib.pyplot.switch_backend(backend)`;
+	 3. Replaces the `matplotlib.pyplot.draw_if_interactive` method with the same method, but wrapped by a `flag_calls` decorator, which adds a `called` flag to the method. That flag will be used by the new `%run` runner that's introduced below at point #5;
+3. **Configure inline figure support** by calling [`IPython.core.pylabtools.configure_inline_support(shell, backend)`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L359-L415). This is where some very interesting stuff happens. It first checks that `InlineBackend` is actually importable from [`ipykernel.pylab.backend_inline`](https://github.com/ipython/ipykernel/blob/v5.1.2/ipykernel/pylab/backend_inline.py), otherwise it returns immediately. But if it's importable and the backend is `"inline"`, it:
+	1. Imports the [`ipykernel.pylab.backend_inline.flush_figures`](https://github.com/ipython/ipykernel/blob/ae9ebd0da9cff1b9a5fd6e409c0de44892da9100/ipykernel/pylab/backend_inline.py#L100-L143) function, and register it as a callback for the `"post_execute"` event of the shell. As we'll see later, callbacks for `"post_execute"` are called after executing every cell;
+	2. If the backend was _not_ `"inline"`, it'll unregister the `flush_figures` callback;
+4. **Enable the GUI by calling [`shell.enable_gui(gui)`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/interactiveshell.py#L515-L521).** This method is not implemented in the `IPython.core.interactiveshell.InteractiveShell` base class, but rather in `IPython.terminal.interactiveshell.TerminalInteractiveShell`. If a `gui` as specified, it gets the name of the `active_eventloop` and its corresponding `inputhook` function using [`IPython.terminal.pt_intputhooks.get_inputhook_name_and_func(gui)`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/pt_inputhooks/__init__.py#L33-L49). The `active_eventloop` is just a string, such as `'qt'`, but the `inputhook` is more interesting. It's the function to call to start that GUI toolkit's event loop. Let's dig further into `get_inputhook_name_and_func(gui)`. That function checks a few things, but it essentially:
+	1. Imports the correct `inputhook` function for the chosen GUI by importing it from [`IPython.terminal.pt_intputhooks.<gui_mod>`](https://github.com/ipython/ipython/tree/7.8.0/IPython/terminal/pt_inputhooks). For example, the Qt `inputhook` is imported from [`IPython.terminal.pt_intputhooks.qt`](https://github.com/ipython/ipython/blob/7.8.0/IPython/terminal/pt_inputhooks/qt.py).  Later on, when [`inputhook` is executed for Qt](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/pt_inputhooks/qt.py#L11-L53), it will:
+		1. Create a [`QCoreApplication`](https://doc.qt.io/qt-5/qcoreapplication.html);
+		2. Create a [`QEventLoop`](https://doc.qt.io/qt-5/qeventloop.html) for that application;
+		3. Execute the event loop and register the right events to make sure the loop is shut down properly. The exact operations to start and stop the loop are slightly different for other GUI toolkits, like `tk`, `wx`, or `osx`,  but they all essentially do the same thing. At this point we're ready to go back up the stack to `enable_matplotlib` in `%matplotlib`;
+5. **Replace IPython's `default_runner` with the one defined in [`IPython.core.pylabtools.mpl_runner`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L145-L192).** The `default_runner` is the function that executes code when using the `%run` magic. The `mpl_runner`:
+	1. Saves the `matplotlib.interactive` state, and disables it;
+	2. Executes the file;
+	3. Restores the `interactive` state;
+	4. Makes the rendering call, if the user asked for it, by checking the `plt.draw_if_interactive.called` flag that was introduced at point #1.3 above.
+
+As for the other magic, [`%gui`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/magics/basic.py#L468-L501), it only executes a subset of what `%matplotlib` does. It only calls `shell.enable_gui(gui)`, which is point #4 above. This means that if your application requires interaction with a GUI's event loop, but doesn't require matplotlib, then it's sufficient to use `%gui`. For example, if you're writing applications using [TraitsUI](https://docs.enthought.com/traitsui/) or [PyQt](https://riverbankcomputing.com/software/pyqt/intro/).
+
+## The Effect of Calling `%gui` and `%matplotlib`
+
+Let's start with the "simplest" one, `%gui`. If you execute it in a fresh IPython session, it'll only start the event loop. On macOS, the obvious effect of this is to start the Rocket icon.
+
+![Animation of the Python rocket icon starting because of a call to `%gui`.](images/2020-05-31-ipython-gui.gif)
+
+At that point, if you import matplotlib and call `plt.plot()`, no figure will appear unless you either call `plt.show()` afterwards, or manually enable interactive mode with `plt.interactive(True)`.
+
+On the other hand, if you start your session by calling `%matplotlib`, it'll start the Rocket _and_ activate matplotlib's interactive mode. This way, if you call `plt.plot()`, your figure will show up immediately and your session will not be blocked.
+
+## Using `%run`
+
+If you call `%run my_script.py`  _after_ calling `%matplotlib`, `my_script.py` will be executed with the [`mpl_runner`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L145-L192) introduced above at point #5.
+
+## Executing a Jupyter Notebok Cell When Using the `"inline"` Backend
+
+In the terminal the [`IPython.terminal.interactiveshell.TerminalInteractiveShell.interact()`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/interactiveshell.py#L471-L489) method is where all the fun stuff happens. It prompts you for code, checks if you want to exit, and then executes the cell with [`InteractiveShell.run_cell(code)`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/interactiveshell.py#L2828-L2860) and _then_ trigger the `"post_execute"` event for which we've registered the `ipykernel.pylab.backend_inline.flush_figures` callback. As you might have noticed, the `flush_figures` function comes from ipykernel, and not from IPython. It tries to return all the figures produced by the cell as PNG of SVG, displays them on screen using IPython's [`display`](https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/display.py#L131-L315) function, and then closes all the figures, so matplotlib doesn't end up littered will all the figures we've ever plotted.
+
+
+## Conclusion
+
+To sum it up, use `%matplotlib` if you want interactive plotting with matplotlib. If you're only interested in the GUI's event loop, `%gui <backend>` is sufficient._ Although as far as I understand, there's nothing very wrong with using `%matplotlib` all the time.
