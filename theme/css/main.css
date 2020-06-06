@@ -53,11 +53,11 @@ article a {
 }
 
 pre {
-    padding: 0px 15px;
-    width: calc(100% - 30px); /* Cancels out the left/right paddings */
+    padding: 1em 0em;
     font-size: 0.9em;
     overflow-x: auto;
-	line-height: 1;
+    overflow-y: none;
+    line-height: 1;
 }
 
 blockquote {
@@ -75,7 +75,6 @@ blockquote {
 
 .article-title a {
     text-decoration: none;
-    
 }
 
 .meta {

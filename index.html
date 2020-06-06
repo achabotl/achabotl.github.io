@@ -1,4 +1,296 @@
-<!DOCTYPE html><html lang=en xml:lang=en xmlns=http://www.w3.org/1999/xhtml><head><meta charset=UTF-8><title>Shredded Bits</title><meta name=viewport content="width=device-width, initial-scale=1"><link rel=stylesheet href=/theme/css/style.min.css?f7fca20c></head><body><div id=main><header><h1 id=site-name><a href=/ >Shredded Bits</a></h1></header><hr><nav><ul class=navbar id=left-navbar><li><a href=/about>About</a></li><li><a href=/projects>Projects</a></li><li><a href=/archives>Archives</a></li></ul><ul class=navbar id=right-navbar></ul></nav><hr id=hr-nav><div id=content><div class=article-content><article><h1 class=article-title><a href=https://alexchabot.net/2020/05/31/what-does-matplotlib-do-in-ipython/ >What does %matplotlib do in IPython</a></h1><div class=meta><time datetime="2020-05-31 00:00:00-05:00">2020-05-31</time> by <span class=author>Alexandre Chabot-Leclerc</span></div><p><em><span class=caps>TLDR</span>; Use <code>%matplotlib</code> if you want interactive plotting with matplotlib. If you&#8217;re only interested in the <span class=caps>GUI</span>&#8217;s event loop, <code>%gui &lt;backend&gt;</code> is&nbsp;sufficient.</em></p><p>I never really understood the difference between <code>%gui</code> and <code>%matplotlib</code> in IPython. One of my colleagues at Enthought once told me that at some point in his career, he more or less stopped reading documentation and instead went straight to the code. That&#8217;s what I did here. But let&#8217;s do a bit of history&nbsp;first.</p><p>In the &#8220;beginning&#8221;, there was <code>pylab</code>. It (still) is a module of matplotlib and was a flag to IPython designed to <a href=https://web.archive.org/web/20130609145008/https://wiki.scipy.org/PyLab>facilitate the adoption of Python as a numerical computing language</a> by providing a <span class=caps>MATLAB</span>-like syntax.<sup id=fnref-matlab><a class=footnote-ref href=#fn-matlab>1</a></sup> The reference was so explicit that before being renamed to <code>pylab</code> on <a href=https://github.com/matplotlib/matplotlib/commit/f210efb0aff44a108239496c877aefe6b7cab2e5>Dec 9, 2004</a>, the module was called <code>matplotlib.matlab</code>. IPython adopted the rename on the <a href=https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R616>same day</a>.<sup id=fnref-pylab><a class=footnote-ref href=#fn-pylab>2</a></sup> With the <code>‑‑pylab</code> flag or the <code>%pylab</code> magic function, IPython would set up matplotlib for interactive plotting and executed a number of imports from IPython, NumPy and matplotlib. Even thought it helped a few people transition to Python (including myself), it turned out to be a pretty bad idea from a usability point of view. Matthias Bussonnier wrote up a good list of the many things that are wrong with it in &#8220;<a href=https://matthiasbussonnier.com/posts/10-No-PyLab-Thanks.html>No Pylab Thanks</a>.&#8221;</p><p>For the 1.0.0 release of IPython in August 2013, all mentions of <code>%pylab</code> were removed from the examples (in a <a href=https://github.com/ipython/ipython/pull/3683>July 18, 2013</a> commit) and were replaced by calls to the <code>%matplotlib</code> magic function, which only enables interactive plotting but does not perform any imports. The <code>%matplotlib</code> function had already been introduced in a <a href=https://github.com/ipython/ipython/commit/7ae1fe4225c0c11ccdd6eec758c23aa81ac88654>2013 refactoring</a> to separate the interatice plotting from the imports. The <code>%gui</code> magic command had already been <a href=https://github.com/ipython/ipython/commit/a38045e05d22fee06a56ae884856ed689523ff7b>introduced</a> in 2009 by Brian Granger to &#8220;manage the events loops&#8221; (hint&nbsp;hint).</p><p>Now we know that the (my) confusion with <code>%gui</code> and <code>%matplotlib</code> started in&nbsp;2013. </p><p>This analysis refers to <a href=https://github.com/ipython/ipython/tree/7.8.0>IPython 7.8.0</a> and <a href=https://github.com/ipython/ipykernel/tree/v5.1.2>ipykernel 5.1.2</a>.</p><p>Our entry point will be the <code>%matplotlib</code> magic command. Its source code is in the <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/magics/pylab.py#L46-L100><code>IPython.core.pylab.py</code></a> file. The essential call is to <code>shell.enable_matplotlib(gui)</code>, which is itself implemented in <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/interactiveshell.py#L3380-L3423><code>IPython.core.interactiveshell.InteractiveShell</code></a>, and does five&nbsp;things:</p><ol><li><strong>Select the &#8220;backend&#8221; given the choice of <span class=caps>GUI</span> event loop.</strong> This is done by calling <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L259-L299><code>IPython.core.pylabtools.find_gui_and_backend(gui)</code></a>. It encapsulates the logic to go from a <span class=caps>GUI</span> name, like <code>"qt5"</code> or <code>"tk"</code>, to a backend name, like <code>"Qt5Agg"</code> and <code>"TkAgg"</code>.</li><li><strong>Activate matplotlib for interactive use</strong> by calling <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L302-L323><code>IPython.core.pylabtools.activate_matplotlib(backend)</code></a>, which:<ol><li>Activates the interactive mode with <code>matplotlib.interactive(True)</code>; </li><li>Switches to the new backend with <code>matplotlib.pyplot.switch_backend(backend)</code>;</li><li>Replaces the <code>matplotlib.pyplot.draw_if_interactive</code> method with the same method, but wrapped by a <code>flag_calls</code> decorator, which adds a <code>called</code> flag to the method. That flag will be used by the new <code>%run</code> runner that&#8217;s introduced below at point&nbsp;#5;</li></ol></li><li><strong>Configure inline figure support</strong> by calling <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L359-L415><code>IPython.core.pylabtools.configure_inline_support(shell, backend)</code></a>. This is where some very interesting stuff happens. It first checks that <code>InlineBackend</code> is actually importable from <a href=https://github.com/ipython/ipykernel/blob/v5.1.2/ipykernel/pylab/backend_inline.py><code>ipykernel.pylab.backend_inline</code></a>, otherwise it returns immediately. But if it&#8217;s importable and the backend is <code>"inline"</code>, it:<ol><li>Imports the <a href=https://github.com/ipython/ipykernel/blob/ae9ebd0da9cff1b9a5fd6e409c0de44892da9100/ipykernel/pylab/backend_inline.py#L100-L143><code>ipykernel.pylab.backend_inline.flush_figures</code></a> function, and register it as a callback for the <code>"post_execute"</code> event of the shell. As we&#8217;ll see later, callbacks for <code>"post_execute"</code> are called after executing every&nbsp;cell;</li><li>If the backend was <em>not</em><code>"inline"</code>, it&#8217;ll unregister the <code>flush_figures</code> callback;</li></ol></li><li><strong>Enable the <span class=caps>GUI</span> by calling <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/interactiveshell.py#L515-L521><code>shell.enable_gui(gui)</code></a>.</strong> This method is not implemented in the <code>IPython.core.interactiveshell.InteractiveShell</code> base class, but rather in <code>IPython.terminal.interactiveshell.TerminalInteractiveShell</code>. If a <code>gui</code> as specified, it gets the name of the <code>active_eventloop</code> and its corresponding <code>inputhook</code> function using <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/pt_inputhooks/__init__.py#L33-L49><code>IPython.terminal.pt_intputhooks.get_inputhook_name_and_func(gui)</code></a>. The <code>active_eventloop</code> is just a string, such as <code>'qt'</code>, but the <code>inputhook</code> is more interesting. It&#8217;s the function to call to start that <span class=caps>GUI</span> toolkit&#8217;s event loop. Let&#8217;s dig further into <code>get_inputhook_name_and_func(gui)</code>. That function checks a few things, but it essentially:<ol><li>Imports the correct <code>inputhook</code> function for the chosen <span class=caps>GUI</span> by importing it from <a href=https://github.com/ipython/ipython/tree/7.8.0/IPython/terminal/pt_inputhooks><code>IPython.terminal.pt_intputhooks.&lt;gui_mod&gt;</code></a>. For example, the Qt <code>inputhook</code> is imported from <a href=https://github.com/ipython/ipython/blob/7.8.0/IPython/terminal/pt_inputhooks/qt.py><code>IPython.terminal.pt_intputhooks.qt</code></a>. Later on, when <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/pt_inputhooks/qt.py#L11-L53><code>inputhook</code> is executed for Qt</a>, it will:<ol><li>Create a <a href=https://doc.qt.io/qt-5/qcoreapplication.html><code>QCoreApplication</code></a>;</li><li>Create a <a href=https://doc.qt.io/qt-5/qeventloop.html><code>QEventLoop</code></a> for that&nbsp;application;</li><li>Execute the event loop and register the right events to make sure the loop is shut down properly. The exact operations to start and stop the loop are slightly different for other <span class=caps>GUI</span> toolkits, like <code>tk</code>, <code>wx</code>, or <code>osx</code>, but they all essentially do the same thing. At this point we&#8217;re ready to go back up the stack to <code>enable_matplotlib</code> in <code>%matplotlib</code>;</li></ol></li></ol></li><li><strong>Replace IPython&#8217;s <code>default_runner</code> with the one defined in <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L145-L192><code>IPython.core.pylabtools.mpl_runner</code></a>.</strong> The <code>default_runner</code> is the function that executes code when using the <code>%run</code> magic. The <code>mpl_runner</code>:<ol><li>Saves the <code>matplotlib.interactive</code> state, and disables&nbsp;it;</li><li>Executes the&nbsp;file;</li><li>Restores the <code>interactive</code> state;</li><li>Makes the rendering call, if the user asked for it, by checking the <code>plt.draw_if_interactive.called</code> flag that was introduced at point #1.3&nbsp;above.</li></ol></li></ol><p>As for the other magic, <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/magics/basic.py#L468-L501><code>%gui</code></a>, it only executes a subset of what <code>%matplotlib</code> does. It only calls <code>shell.enable_gui(gui)</code>, which is point #4 above. This means that if your application requires interaction with a <span class=caps>GUI</span>&#8217;s event loop, but doesn&#8217;t require matplotlib, then it&#8217;s sufficient to use <code>%gui</code>. For example, if you&#8217;re writing applications using <a href=https://docs.enthought.com/traitsui/ >TraitsUI</a> or <a href=https://riverbankcomputing.com/software/pyqt/intro/ >PyQt</a>.</p><h2>The Effect of Calling <code>%gui</code> and <code>%matplotlib</code></h2><p>Let&#8217;s start with the &#8220;simplest&#8221; one, <code>%gui</code>. If you execute it in a fresh IPython session, it&#8217;ll only start the event loop. On macOS, the obvious effect of this is to start the Rocket&nbsp;icon.</p><p><img alt="Animation of the Python rocket icon starting because of a call to %gui." src=images/2020-05-31-ipython-gui.gif></p><p>At that point, if you import matplotlib and call <code>plt.plot()</code>, no figure will appear unless you either call <code>plt.show()</code> afterwards, or manually enable interactive mode with <code>plt.interactive(True)</code>.</p><p>On the other hand, if you start your session by calling <code>%matplotlib</code>, it&#8217;ll start the Rocket <em>and</em> activate matplotlib&#8217;s interactive mode. This way, if you call <code>plt.plot()</code>, your figure will show up immediately and your session will not be&nbsp;blocked.</p><h2>Using <code>%run</code></h2><p>If you call <code>%run my_script.py</code><em>after</em> calling <code>%matplotlib</code>, <code>my_script.py</code> will be executed with the <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L145-L192><code>mpl_runner</code></a> introduced above at point&nbsp;#5.</p><h2>Executing a Jupyter Notebok Cell When Using the <code>"inline"</code> Backend</h2><p>In the terminal the <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/interactiveshell.py#L471-L489><code>IPython.terminal.interactiveshell.TerminalInteractiveShell.interact()</code></a> method is where all the fun stuff happens. It prompts you for code, checks if you want to exit, and then executes the cell with <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/interactiveshell.py#L2828-L2860><code>InteractiveShell.run_cell(code)</code></a> and <em>then</em> trigger the <code>"post_execute"</code> event for which we&#8217;ve registered the <code>ipykernel.pylab.backend_inline.flush_figures</code> callback. As you might have noticed, the <code>flush_figures</code> function comes from ipykernel, and not from IPython. It tries to return all the figures produced by the cell as <span class=caps>PNG</span> of <span class=caps>SVG</span>, displays them on screen using IPython&#8217;s <a href=https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/display.py#L131-L315><code>display</code></a> function, and then closes all the figures, so matplotlib doesn&#8217;t end up littered will all the figures we&#8217;ve ever&nbsp;plotted.</p><h2>Conclusion</h2><p>To sum it up, use <code>%matplotlib</code> if you want interactive plotting with matplotlib. If you&#8217;re only interested in the <span class=caps>GUI</span>&#8217;s event loop, <code>%gui &lt;backend&gt;</code> is sufficient._ Although as far as I understand, there&#8217;s nothing very wrong with using <code>%matplotlib</code> all the&nbsp;time.</p><div class=footnote><hr><ol><li id=fn-matlab><p>Basically, no namespaces, and direct access to functions like <code>plot</code>, <code>figure</code>, <code>subplot</code>, etc.&#160;<a class=footnote-backref href=#fnref-matlab title="Jump back to footnote 1 in the text">&#8617;</a></p></li><li id=fn-pylab><p>The earliest commit I found for the IPyhon project was on July 6, 2005 by Fernando Perez, 7 months after the name change. Its Git hash is <a href=https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799>6f629fcc23ba63342548f61cc7307eeef4f55799</a>. But the earliest mention is an <a href=https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R955>August 2004 entry in the ChangeLog</a>: &#8220;ipythonrc-pylab: Add matplotlib support,&#8221; which is <em>before</em> the offical rename in matplotlib.&#160;<a class=footnote-backref href=#fnref-pylab title="Jump back to footnote 2 in the text">&#8617;</a></p></li></ol></div></article></div><hr><div class=article-content><article><h1 class=article-title><a href=https://alexchabot.net/2018/07/14/manually-merging-day-one-journals/ >Manually Merging Day One Journals</a></h1><div class=meta><time datetime="2018-07-14 00:00:00-05:00">2018-07-14</time> by <span class=author>Alexandre Chabot-Leclerc</span></div><p>My first Day One entry is from January 24, 2012. I used it often to take note about what I was doing during my PhD with the <code>#wwid</code> tag (what was I doing, an idea from <a href=http://brettterpstra.com/ >Brett Terpstra</a>, I think), and sometimes to clarify some&nbsp;thoughts.</p><p>When Day One went The Way of the Subscription, I didn&#8217;t bother too much because Dropbox sync still worked. Until it didn&#8217;t. I somehow didn&#8217;t realized it and kept adding entries to both the iOS <em>and</em> the macOS versions. Not good. It&#8217;s been on my to do list for a while to find a way to merge the two journals. I could probably subscribe to the Day One sync service and have it figure out the merging but I didn&#8217;t want to subscribe just for&nbsp;that.</p><p>I learned somewhere that Day One 2 could export journals as a folder of photos and a <span class=caps>JSON</span> file. I figure I could probably write a script to do the merging. So I downloaded Day One 2 on my iPhone and Mac, imported my Day One Classic journals, exported them as <span class=caps>JSON</span> to a folder on my Mac, and unzipped them. I also created a <code>merged/</code> folder where to put the merged journal. The hierarchy looks like&nbsp;this:</p><div class=highlight><pre><span></span>$ tree -L <span class=m>2</span>
+<!DOCTYPE html>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Shredded Bits</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/theme/css/style.min.css?38704cca">
+</head>
+<body>
+
+    <div id="main">
+
+        <header><h1 id="site-name"><a href="/">Shredded Bits</a></h1></header>
+        <hr>
+        <nav><ul class="navbar" id="left-navbar">
+        <li><a href="/about">About</a></li>
+        <li><a href="/projects">Projects</a></li>
+        <li><a href="/archives">Archives</a></li>
+
+
+
+</ul>
+
+<ul class="navbar" id="right-navbar">
+</ul></nav>
+        <hr id="hr-nav">
+
+        <div id="content">
+
+<div class="article-content">
+    <article>
+        <h1 class="article-title">
+            <a href="https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels-with-unique-ids/">Custom URL Handler for Zettels with Unique IDs</a>
+        </h1>
+
+        <div class="meta">
+        <time datetime="2020-06-06 00:00:00-05:00">2020-06-06</time> by <span class="author">Alexandre Chabot-Leclerc</span>
+        </div>
+        <p>Yesterday I read a <a href="https://forum.zettelkasten.de/discussion/comment/5609/">series</a> <a href="https://forum.zettelkasten.de/discussion/1121/open-files-in-any-app-from-the-archive-using-url-schemes">of</a> <a href="https://forum.zettelkasten.de/discussion/1152/using-a-custom-url-handler-on-macos-for-any-scripting-purpose">posts</a> on custom <span class="caps">URL</span> scheme handlers on the <a href="https://forum.zettelkasten.de">Zettelkasten forums</a>. The handler registers itself to open links like <code>zettel://202006061337</code>, where the number is the unique <span class="caps">ID</span> of a zettel (here it&#8217;s a timestamp). I&#8217;m not sure everyone realized the magnitude of what that&nbsp;means. </p>
+<p>Combining a custom <span class="caps">URL</span> with a unique <span class="caps">ID</span> means notes and links can become <em>entirely independent from your apps</em>. Only the handler needs to know about the apps you&#8217;re&nbsp;using. </p>
+<p>That alone is very nice, but then I thought: URLs can have query parameters… That means I can have URLs like <code>zettel://202006061337&amp;edit</code> that open in my text editor of choice: <a href="https://macromates.com/">TextMate</a>, <a href="https://www.barebones.com/products/bbedit">BBEdit</a>, <a href="http://www.hogbaysoftware.com/products/writeroom">WriteRoom</a>, <a href="http://www.foldingtext.com/">FoldingText</a>, etc. Or <code>zettel://202006061337&amp;preview</code> to open in <a href="https://marked2app.com/">Marked</a>. Or I could even pick the app interactively with <code>zettel://202006061337&amp;pick</code>.</p>
+<p>Handling the <span class="caps">ID</span> alone is pretty easy since the common Zettelkasten-like apps respond to a <span class="caps">URL</span> scheme to search and open files. <a href="https://zettelkasten.de/the-archive/help/#how-do-i-link-to-notes-from-other-apps">The Archive</a> uses <code>thearchive://match/ID</code>, <a href="https://nvultra.com/help/advanced-features#urlhandler">nvUltra</a> uses <code>x-nvultra://find/ID</code>, and <a href="https://brettterpstra.com/2012/02/02/connecting-nvalt-and-address-book/">nvAlt</a> uses <code>nvalt://find/ID</code>.</p>
+<p>But how to open in a text editor or in Marked given only the <span class="caps">ID</span>? With Spotlight. I used <code>mdfind -name ID</code> to find the file. This could be further refined with the <code>-onlyin FOLDER</code> option but I didn&#8217;t need it. Then it&#8217;s a matter of calling <code>open -a Marked FILEPATH</code>.</p>
+<p>There&#8217;s also a <code>zettel://create</code> special case that will create a new zettel with the current time stamp (<span class="caps">YYYYMMDDHHMM</span>). It&#8217;s always done with the default Zettelkasten app because the script doesn&#8217;t know where to write the file but the app&nbsp;does.</p>
+<p>I wrote the handler in Applecript because it&#8217;s the easiest way I know to create something that macOS considers an &#8220;app&#8221; and that can therefore handle&nbsp;URLs. </p>
+<p>The full script is below. To use&nbsp;it:</p>
+<ol>
+<li>Open Script Editor and paste the code below in a new&nbsp;file.</li>
+<li>[Optional] Modify values in the Configuration section to pick a different <span class="caps">URL</span> prefix, default Zettelkasten app <span class="caps">URL</span>, editor, and previewer. You can add as many apps as you&#8217;d like in the <code>appChoices</code> array.</li>
+<li>Save as &#8220;Application&#8221;. You can save it anywhere. Make sure <a href="https://apple.stackexchange.com/questions/245772/how-to-get-rid-of-applescript-confirmation">none of the boxes are checked</a>.</li>
+<li>Register the app as a <span class="caps">URL</span> handler. You can do it with the <a href="https://github.com/Lord-Kamina/SwiftDefaultApps">SwiftDefaultApps</a> Preference pane, or using the instructions provided by Christian Tietze <a href="https://forum.zettelkasten.de/discussion/comment/6133/#Comment_6133">in the forums</a>:<ul>
+<li>Locate the application file you just&nbsp;created</li>
+<li>Right-click the app, select &#8220;Show Package&nbsp;Contents&#8221;</li>
+<li>Inside, open <code>Contents/Info.plist</code> <em>with a text&nbsp;editor</em></li>
+<li>Paste the following in a blank line right below the <code>&lt;dict&gt;</code> line. Replace <code>zettel</code> with the <span class="caps">URL</span> prefix you&#8217;ve&nbsp;chosen:</li>
+</ul>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><span class="nt">&lt;key&gt;</span>CFBundleURLTypes<span class="nt">&lt;/key&gt;</span>
+<span class="nt">&lt;array&gt;</span>
+    <span class="nt">&lt;dict&gt;</span>
+        <span class="nt">&lt;key&gt;</span>CFBundleURLName<span class="nt">&lt;/key&gt;</span>
+        <span class="nt">&lt;string&gt;</span>Zettel Link Opener<span class="nt">&lt;/string&gt;</span>
+        <span class="nt">&lt;key&gt;</span>CFBundleURLSchemes<span class="nt">&lt;/key&gt;</span>
+        <span class="nt">&lt;array&gt;</span>
+            <span class="nt">&lt;string&gt;</span>zettel<span class="nt">&lt;/string&gt;</span>
+        <span class="nt">&lt;/array&gt;</span>
+    <span class="nt">&lt;/dict&gt;</span>
+<span class="nt">&lt;/array&gt;</span>
+</pre></div>
+
+
+<p>Here&#8217;s the full&nbsp;script:</p>
+<div class="highlight"><pre><span></span><span class="c">-- Zettel Link Opener</span>
+<span class="c">-- Created by Alexandre Chabot-Leclerc</span>
+<span class="c">-- Source: https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels/</span>
+<span class="c">-- URL Handler for zettelkasten unique IDs, e.g., zettel://202006061017</span>
+<span class="c">-- Handles options after the ID to open different apps:</span>
+<span class="c">--    zettel://202006061017&amp;edit to open is a text editor like TextMate</span>
+<span class="c">--    zettel://202006061017&amp;preview to open in a preview app like Marked</span>
+<span class="c">--    zettel://202006061017&amp;pick to open a menu of apps to pick from</span>
+
+<span class="c">-----------------------------------------------------------</span>
+<span class="c">-- CONFIGURATION</span>
+<span class="c">-- URL prefix for your custom URL, e.g. zettel://ZETTEL_ID</span>
+<span class="k">property</span> <span class="nv">urlPrefix</span> <span class="p">:</span> <span class="s2">&quot;zettel&quot;</span>
+
+<span class="c">-- Default URL to call to open a note with a given ID. The ID will be appended</span>
+<span class="k">property</span> <span class="nv">defaultZkAppUrl</span> <span class="p">:</span> <span class="s2">&quot;thearchive://match/&quot;</span>
+<span class="c">--property defaultZkAppUrl : &quot;nvalt://find/&quot;</span>
+<span class="c">--property defaultZkAppUrl : &quot;x-nvultra://find/&quot;</span>
+
+<span class="c">-- URL to use to create a new zettle with the current timestamp YYYYMMDDHHMM</span>
+<span class="k">property</span> <span class="nv">urlForCreation</span> <span class="p">:</span> <span class="s2">&quot;thearchive://matchOrCreate/&quot;</span>
+<span class="c">--property urlForCreation : &quot;nvalt://make?txt=&quot;</span>
+<span class="c">--property urlForCreation : &quot;x-nvultra://make?txt=&quot;</span>
+
+<span class="c">-- Apps to use for the different query parameters</span>
+<span class="k">property</span> <span class="nv">editApp</span> <span class="p">:</span> <span class="s2">&quot;FoldingText&quot;</span> <span class="c">-- App to used with &quot;&amp;edit&quot; query parameter</span>
+<span class="k">property</span> <span class="nv">previewApp</span> <span class="p">:</span> <span class="s2">&quot;Marked&quot;</span> <span class="c">-- App to used with &quot;&amp;preview&quot; query parameter </span>
+
+<span class="c">-- List of app to display in the menu with with &amp;pick query option</span>
+<span class="c">-- The apps will appear in the order defined here</span>
+<span class="k">property</span> <span class="nv">appChoices</span> <span class="p">:</span> <span class="p">{</span><span class="nv">defaultZkAppUrl</span><span class="p">,</span> <span class="nv">editApp</span><span class="p">,</span> <span class="nv">previewApp</span><span class="p">,</span> <span class="s2">&quot;TextMate&quot;</span><span class="p">}</span>
+<span class="k">property</span> <span class="nv">defaultApp</span> <span class="p">:</span> <span class="p">{</span><span class="nv">defaultZkAppUrl</span><span class="p">})</span>
+<span class="c">-----------------------------------------------------------</span>
+
+<span class="k">on</span> <span class="nv">splitText</span><span class="p">(</span><span class="nv">theText</span><span class="p">,</span> <span class="nv">theDelimiter</span><span class="p">)</span>
+    <span class="k">set</span> <span class="no">AppleScript</span>&#39;s <span class="no">text item delimiters</span> <span class="k">to</span> <span class="nv">theDelimiter</span>
+    <span class="k">set</span> <span class="nv">theTextItems</span> <span class="k">to</span> <span class="nb">every</span> <span class="nb">text</span> <span class="nb">item</span> <span class="k">of</span> <span class="nv">theText</span>
+    <span class="k">set</span> <span class="no">AppleScript</span>&#39;s <span class="no">text item delimiters</span> <span class="k">to</span> <span class="s2">&quot;&quot;</span>
+    <span class="no">return</span> <span class="nv">theTextItems</span>
+<span class="k">end</span> <span class="nv">splitText</span>
+
+<span class="k">on</span> <span class="nv">removeUrlPrefix</span><span class="p">(</span><span class="nv">original</span><span class="p">)</span>
+    <span class="c">-- Remove URL prefix so we&#39;re left with only the ID and the optional query parameter</span>
+    <span class="no">return</span> <span class="nb">do shell script</span> <span class="s2">&quot;echo &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">original</span> <span class="o">&amp;</span> <span class="s2">&quot; | sed &#39;s;&quot;</span> <span class="o">&amp;</span> <span class="nv">urlPrefix</span> <span class="o">&amp;</span> <span class="s2">&quot;://;;&#39;&quot;</span>
+<span class="k">end</span> <span class="nv">removeUrlPrefix</span>
+
+<span class="k">on</span> <span class="nv">getIdAndOption</span><span class="p">(</span><span class="nv">resouceAndQuery</span><span class="p">)</span>
+    <span class="c">-- Split the zettel ID and the optional parameter</span>
+    <span class="c">-- For example 202006061012&amp;edit or 202006061012&amp;preview</span>
+    <span class="k">set</span> <span class="nv">theItems</span> <span class="k">to</span> <span class="nv">splitText</span><span class="p">(</span><span class="nv">resouceAndQuery</span><span class="p">,</span> <span class="s2">&quot;&amp;&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nv">length</span> <span class="k">of</span> <span class="nv">theItems</span> <span class="ow">is</span> <span class="mi">1</span> <span class="k">then</span>
+        <span class="c">-- Append an empty string if there&#39;s no option so this</span>
+        <span class="c">-- function always returns an array of 2 elements</span>
+        <span class="nb">copy</span> <span class="s2">&quot;&quot;</span> <span class="k">to</span> <span class="nb">the</span> <span class="k">end</span> <span class="k">of</span> <span class="nv">theItems</span>
+    <span class="k">end</span> <span class="k">if</span>
+    <span class="no">return</span> <span class="nv">theItems</span>
+<span class="k">end</span> <span class="nv">getIdAndOption</span>
+
+<span class="k">on</span> <span class="nv">findFilepath</span><span class="p">(</span><span class="nv">zk_id</span><span class="p">)</span>
+    <span class="c">-- Finds the filepath using Spotlight.</span>
+    <span class="c">-- It&#39;s easier than finding the proper filename given only the zettel ID</span>
+    <span class="no">return</span> <span class="nb">do shell script</span> <span class="s2">&quot;mdfind -name &quot;</span> <span class="o">&amp;</span> <span class="nv">zk_id</span>
+<span class="k">end</span> <span class="nv">findFilepath</span>
+
+<span class="k">on</span> <span class="nv">createZettel</span><span class="p">()</span>
+    <span class="k">set</span> <span class="nv">newZkId</span> <span class="k">to</span> <span class="nb">do shell script</span> <span class="s2">&quot;date +&#39;%Y%m%d%H%M&#39;&quot;</span>
+    <span class="nb">do shell script</span> <span class="s2">&quot;open &quot;</span> <span class="o">&amp;</span> <span class="nv">urlForCreation</span> <span class="o">&amp;</span> <span class="nv">newZkId</span>
+<span class="k">end</span> <span class="nv">createZettel</span>
+
+<span class="k">on</span> <span class="nv">openInChoosenApp</span><span class="p">(</span><span class="nv">zkId</span><span class="p">,</span> <span class="nv">zkFilepath</span><span class="p">)</span>
+    <span class="c">--  From Simple List Handler by Patrick Welker &lt;http://rocketink.net&gt;</span>
+    <span class="c">-- Promp the use for the app to use</span>
+    <span class="k">set</span> <span class="nv">selectedApp</span> <span class="k">to</span> <span class="nb">item</span> <span class="mi">1</span> <span class="k">of</span> <span class="p">(</span><span class="nb">choose from list</span> <span class="nb">the</span> <span class="nv">appChoices</span> <span class="nv">with</span> <span class="na">title</span> <span class="s2">&quot;Available App&quot;</span> <span class="nv">with</span> <span class="na">prompt</span> <span class="s2">&quot;Which app do you want to use?&quot;</span> <span class="nv">default</span> <span class="nb">items</span> <span class="nv">defaultApp</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nv">selectedApp</span> <span class="ow">is</span> <span class="no">false</span> <span class="k">then</span>
+        <span class="c">-- Exit prematurly if the user clicked Cancel</span>
+        <span class="k">error</span> <span class="nv">number</span> <span class="o">-</span><span class="mi">128</span>
+    <span class="k">end</span> <span class="k">if</span>
+
+    <span class="c">-- Open the URL directly, or open by app name</span>
+    <span class="k">if</span> <span class="nv">selectedApp</span> <span class="ow">contains</span> <span class="s2">&quot;://&quot;</span> <span class="k">then</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open &quot;</span> <span class="o">&amp;</span> <span class="nv">selectedApp</span> <span class="o">&amp;</span> <span class="nv">zkId</span>
+    <span class="k">else</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open -a &quot;</span> <span class="o">&amp;</span> <span class="nv">selectedApp</span> <span class="o">&amp;</span> <span class="s2">&quot; &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">zkFilepath</span>
+    <span class="k">end</span> <span class="k">if</span>
+<span class="k">end</span> <span class="nv">openInChoosenApp</span>
+
+<span class="k">on</span> <span class="nb">open location</span> <span class="nv">thisURL</span>
+    <span class="k">set</span> <span class="nv">resouceAndQuery</span> <span class="k">to</span> <span class="nv">removeUrlPrefix</span><span class="p">(</span><span class="nv">thisURL</span><span class="p">)</span>
+    <span class="k">set</span> <span class="nv">idAndOption</span> <span class="k">to</span> <span class="nv">getIdAndOption</span><span class="p">(</span><span class="nv">resouceAndQuery</span><span class="p">)</span>
+    <span class="k">set</span> <span class="nv">zkId</span> <span class="k">to</span> <span class="nb">item</span> <span class="mi">1</span> <span class="k">of</span> <span class="nv">idAndOption</span>
+
+    <span class="k">if</span> <span class="nv">zkId</span> <span class="ow">is</span> <span class="s2">&quot;create&quot;</span> <span class="k">then</span>
+        <span class="nv">createZettel</span><span class="p">()</span>
+        <span class="no">return</span>
+    <span class="k">end</span> <span class="k">if</span>
+
+    <span class="k">set</span> <span class="nv">zkFilepath</span> <span class="k">to</span> <span class="nv">findFilepath</span><span class="p">(</span><span class="nv">zkId</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">item</span> <span class="mi">2</span> <span class="k">of</span> <span class="nv">idAndOption</span> <span class="ow">is</span> <span class="s2">&quot;edit&quot;</span> <span class="k">then</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open -a &quot;</span> <span class="o">&amp;</span> <span class="nv">editApp</span> <span class="o">&amp;</span> <span class="s2">&quot; &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">zkFilepath</span>
+        <span class="c">-- Exit the script immediately so we don&#39;t also open in the default app</span>
+        <span class="no">return</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nb">item</span> <span class="mi">2</span> <span class="k">of</span> <span class="nv">idAndOption</span> <span class="ow">is</span> <span class="s2">&quot;preview&quot;</span> <span class="k">then</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open -a &quot;</span> <span class="o">&amp;</span> <span class="nv">previewApp</span> <span class="o">&amp;</span> <span class="s2">&quot; &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">zkFilepath</span>
+        <span class="c">-- Exit the script immediately so we don&#39;t also open in the default app(</span>
+        <span class="no">return</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nb">item</span> <span class="mi">2</span> <span class="k">of</span> <span class="nv">idAndOption</span> <span class="ow">is</span> <span class="s2">&quot;pick&quot;</span> <span class="k">then</span>
+        <span class="nv">openInChoosenApp</span><span class="p">(</span><span class="nv">zkId</span><span class="p">,</span> <span class="nv">zkFilepath</span><span class="p">)</span>
+        <span class="no">return</span>
+    <span class="k">end</span> <span class="k">if</span>
+
+    <span class="c">-- Fall back to the default handler if there was no option</span>
+    <span class="c">-- or the option was invalid</span>
+    <span class="nb">do shell script</span> <span class="s2">&quot;open &quot;</span> <span class="o">&amp;</span> <span class="nv">defaultZkAppUrl</span> <span class="o">&amp;</span> <span class="nv">zkId</span>
+<span class="k">end</span> <span class="nb">open location</span>
+</pre></div>
+    </article>
+</div>
+
+            <hr>
+<div class="article-content">
+    <article>
+        <h1 class="article-title">
+            <a href="https://alexchabot.net/2020/05/31/what-does-matplotlib-do-in-ipython/">What does %matplotlib do in IPython</a>
+        </h1>
+
+        <div class="meta">
+        <time datetime="2020-05-31 00:00:00-05:00">2020-05-31</time> by <span class="author">Alexandre Chabot-Leclerc</span>
+        </div>
+        <p><em><span class="caps">TLDR</span>; Use <code>%matplotlib</code> if you want interactive plotting with matplotlib. If you&#8217;re only interested in the <span class="caps">GUI</span>&#8217;s event loop, <code>%gui &lt;backend&gt;</code> is&nbsp;sufficient.</em></p>
+<p>I never really understood the difference between <code>%gui</code> and <code>%matplotlib</code> in IPython. One of my colleagues at Enthought once told me that at some point in his career, he more or less stopped reading documentation and instead went straight to the code. That&#8217;s what I did here. But let&#8217;s do a bit of history&nbsp;first.</p>
+<p>In the &#8220;beginning&#8221;, there was <code>pylab</code>. It (still) is a module of matplotlib and was a flag to IPython designed to <a href="https://web.archive.org/web/20130609145008/https://wiki.scipy.org/PyLab">facilitate the adoption of Python as a numerical computing language</a> by providing a <span class="caps">MATLAB</span>-like syntax.<sup id="fnref-matlab"><a class="footnote-ref" href="#fn-matlab">1</a></sup> The reference was so explicit that before being renamed to <code>pylab</code> on <a href="https://github.com/matplotlib/matplotlib/commit/f210efb0aff44a108239496c877aefe6b7cab2e5">Dec 9, 2004</a>, the module was called <code>matplotlib.matlab</code>. IPython adopted the rename on the <a href="https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R616">same day</a>.<sup id="fnref-pylab"><a class="footnote-ref" href="#fn-pylab">2</a></sup> With the <code>‑‑pylab</code> flag or the <code>%pylab</code> magic function, IPython would set up matplotlib for interactive plotting and executed a number of imports from IPython, NumPy and matplotlib. Even thought it helped a few people transition to Python (including myself), it turned out to be a pretty bad idea from a usability point of view. Matthias Bussonnier wrote up a good list of the many things that are wrong with it in &#8220;<a href="https://matthiasbussonnier.com/posts/10-No-PyLab-Thanks.html">No Pylab Thanks</a>.&#8221;</p>
+<p>For the 1.0.0 release of IPython in August 2013, all mentions of <code>%pylab</code> were removed from the examples (in a <a href="https://github.com/ipython/ipython/pull/3683">July 18, 2013</a> commit) and were replaced by calls to the <code>%matplotlib</code> magic function, which only enables interactive plotting but does not perform any imports. The <code>%matplotlib</code> function had already been introduced in a <a href="https://github.com/ipython/ipython/commit/7ae1fe4225c0c11ccdd6eec758c23aa81ac88654">2013 refactoring</a> to separate the interatice plotting from the imports. The <code>%gui</code> magic command had already been <a href="https://github.com/ipython/ipython/commit/a38045e05d22fee06a56ae884856ed689523ff7b">introduced</a> in 2009 by Brian Granger to &#8220;manage the events loops&#8221; (hint&nbsp;hint).</p>
+<p>Now we know that the (my) confusion with <code>%gui</code> and <code>%matplotlib</code> started in&nbsp;2013. </p>
+<p>This analysis refers to <a href="https://github.com/ipython/ipython/tree/7.8.0">IPython 7.8.0</a> and <a href="https://github.com/ipython/ipykernel/tree/v5.1.2">ipykernel 5.1.2</a>.</p>
+<p>Our entry point will be the <code>%matplotlib</code> magic command. Its source code is in the <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/magics/pylab.py#L46-L100"><code>IPython.core.pylab.py</code></a> file. The essential call is to <code>shell.enable_matplotlib(gui)</code>, which is itself implemented in <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/interactiveshell.py#L3380-L3423"><code>IPython.core.interactiveshell.InteractiveShell</code></a>, and does five&nbsp;things:</p>
+<ol>
+<li><strong>Select the &#8220;backend&#8221; given the choice of <span class="caps">GUI</span> event loop.</strong> This is done by calling <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L259-L299"><code>IPython.core.pylabtools.find_gui_and_backend(gui)</code></a>. It encapsulates the logic to go
+from a <span class="caps">GUI</span> name, like <code>"qt5"</code> or <code>"tk"</code>, to a backend name, like <code>"Qt5Agg"</code> and  <code>"TkAgg"</code>.</li>
+<li><strong>Activate matplotlib for interactive use</strong> by calling <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L302-L323"><code>IPython.core.pylabtools.activate_matplotlib(backend)</code></a>, which:<ol>
+<li>Activates the interactive mode with <code>matplotlib.interactive(True)</code>; </li>
+<li>Switches to the  new backend with <code>matplotlib.pyplot.switch_backend(backend)</code>;</li>
+<li>Replaces the <code>matplotlib.pyplot.draw_if_interactive</code> method with the same method, but wrapped by a <code>flag_calls</code> decorator, which adds a <code>called</code> flag to the method. That flag will be used by the new <code>%run</code> runner that&#8217;s introduced below at point&nbsp;#5;</li>
+</ol>
+</li>
+<li><strong>Configure inline figure support</strong> by calling <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L359-L415"><code>IPython.core.pylabtools.configure_inline_support(shell, backend)</code></a>. This is where some very interesting stuff happens. It first checks that <code>InlineBackend</code> is actually importable from <a href="https://github.com/ipython/ipykernel/blob/v5.1.2/ipykernel/pylab/backend_inline.py"><code>ipykernel.pylab.backend_inline</code></a>, otherwise it returns immediately. But if it&#8217;s importable and the backend is <code>"inline"</code>, it:<ol>
+<li>Imports the <a href="https://github.com/ipython/ipykernel/blob/ae9ebd0da9cff1b9a5fd6e409c0de44892da9100/ipykernel/pylab/backend_inline.py#L100-L143"><code>ipykernel.pylab.backend_inline.flush_figures</code></a> function, and register it as a callback for the <code>"post_execute"</code> event of the shell. As we&#8217;ll see later, callbacks for <code>"post_execute"</code> are called after executing every&nbsp;cell;</li>
+<li>If the backend was <em>not</em> <code>"inline"</code>, it&#8217;ll unregister the <code>flush_figures</code> callback;</li>
+</ol>
+</li>
+<li><strong>Enable the <span class="caps">GUI</span> by calling <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/interactiveshell.py#L515-L521"><code>shell.enable_gui(gui)</code></a>.</strong> This method is not implemented in the <code>IPython.core.interactiveshell.InteractiveShell</code> base class, but rather in <code>IPython.terminal.interactiveshell.TerminalInteractiveShell</code>. If a <code>gui</code> as specified, it gets the name of the <code>active_eventloop</code> and its corresponding <code>inputhook</code> function using <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/pt_inputhooks/__init__.py#L33-L49"><code>IPython.terminal.pt_intputhooks.get_inputhook_name_and_func(gui)</code></a>. The <code>active_eventloop</code> is just a string, such as <code>'qt'</code>, but the <code>inputhook</code> is more interesting. It&#8217;s the function to call to start that <span class="caps">GUI</span> toolkit&#8217;s event loop. Let&#8217;s dig further into <code>get_inputhook_name_and_func(gui)</code>. That function checks a few things, but it essentially:<ol>
+<li>Imports the correct <code>inputhook</code> function for the chosen <span class="caps">GUI</span> by importing it from <a href="https://github.com/ipython/ipython/tree/7.8.0/IPython/terminal/pt_inputhooks"><code>IPython.terminal.pt_intputhooks.&lt;gui_mod&gt;</code></a>. For example, the Qt <code>inputhook</code> is imported from <a href="https://github.com/ipython/ipython/blob/7.8.0/IPython/terminal/pt_inputhooks/qt.py"><code>IPython.terminal.pt_intputhooks.qt</code></a>.  Later on, when <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/pt_inputhooks/qt.py#L11-L53"><code>inputhook</code> is executed for Qt</a>, it will:<ol>
+<li>Create a <a href="https://doc.qt.io/qt-5/qcoreapplication.html"><code>QCoreApplication</code></a>;</li>
+<li>Create a <a href="https://doc.qt.io/qt-5/qeventloop.html"><code>QEventLoop</code></a> for that&nbsp;application;</li>
+<li>Execute the event loop and register the right events to make sure the loop is shut down properly. The exact operations to start and stop the loop are slightly different for other <span class="caps">GUI</span> toolkits, like <code>tk</code>, <code>wx</code>, or <code>osx</code>,  but they all essentially do the same thing. At this point we&#8217;re ready to go back up the stack to <code>enable_matplotlib</code> in <code>%matplotlib</code>;</li>
+</ol>
+</li>
+</ol>
+</li>
+<li><strong>Replace IPython&#8217;s <code>default_runner</code> with the one defined in <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L145-L192"><code>IPython.core.pylabtools.mpl_runner</code></a>.</strong> The <code>default_runner</code> is the function that executes code when using the <code>%run</code> magic. The <code>mpl_runner</code>:<ol>
+<li>Saves the <code>matplotlib.interactive</code> state, and disables&nbsp;it;</li>
+<li>Executes the&nbsp;file;</li>
+<li>Restores the <code>interactive</code> state;</li>
+<li>Makes the rendering call, if the user asked for it, by checking the <code>plt.draw_if_interactive.called</code> flag that was introduced at point #1.3&nbsp;above.</li>
+</ol>
+</li>
+</ol>
+<p>As for the other magic, <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/magics/basic.py#L468-L501"><code>%gui</code></a>, it only executes a subset of what <code>%matplotlib</code> does. It only calls <code>shell.enable_gui(gui)</code>, which is point #4 above. This means that if your application requires interaction with a <span class="caps">GUI</span>&#8217;s event loop, but doesn&#8217;t require matplotlib, then it&#8217;s sufficient to use <code>%gui</code>. For example, if you&#8217;re writing applications using <a href="https://docs.enthought.com/traitsui/">TraitsUI</a> or <a href="https://riverbankcomputing.com/software/pyqt/intro/">PyQt</a>.</p>
+<h2>The Effect of Calling <code>%gui</code> and <code>%matplotlib</code></h2>
+<p>Let&#8217;s start with the &#8220;simplest&#8221; one, <code>%gui</code>. If you execute it in a fresh IPython session, it&#8217;ll only start the event loop. On macOS, the obvious effect of this is to start the Rocket&nbsp;icon.</p>
+<p><img alt="Animation of the Python rocket icon starting because of a call to %gui." src="images/2020-05-31-ipython-gui.gif"></p>
+<p>At that point, if you import matplotlib and call <code>plt.plot()</code>, no figure will appear unless you either call <code>plt.show()</code> afterwards, or manually enable interactive mode with <code>plt.interactive(True)</code>.</p>
+<p>On the other hand, if you start your session by calling <code>%matplotlib</code>, it&#8217;ll start the Rocket <em>and</em> activate matplotlib&#8217;s interactive mode. This way, if you call <code>plt.plot()</code>, your figure will show up immediately and your session will not be&nbsp;blocked.</p>
+<h2>Using <code>%run</code></h2>
+<p>If you call <code>%run my_script.py</code>  <em>after</em> calling <code>%matplotlib</code>, <code>my_script.py</code> will be executed with the <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/pylabtools.py#L145-L192"><code>mpl_runner</code></a> introduced above at point&nbsp;#5.</p>
+<h2>Executing a Jupyter Notebok Cell When Using the <code>"inline"</code> Backend</h2>
+<p>In the terminal the <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/terminal/interactiveshell.py#L471-L489"><code>IPython.terminal.interactiveshell.TerminalInteractiveShell.interact()</code></a> method is where all the fun stuff happens. It prompts you for code, checks if you want to exit, and then executes the cell with <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/interactiveshell.py#L2828-L2860"><code>InteractiveShell.run_cell(code)</code></a> and <em>then</em> trigger the <code>"post_execute"</code> event for which we&#8217;ve registered the <code>ipykernel.pylab.backend_inline.flush_figures</code> callback. As you might have noticed, the <code>flush_figures</code> function comes from ipykernel, and not from IPython. It tries to return all the figures produced by the cell as <span class="caps">PNG</span> of <span class="caps">SVG</span>, displays them on screen using IPython&#8217;s <a href="https://github.com/ipython/ipython/blob/c233c25ab8b724646b9bdc407214c3bb7294683c/IPython/core/display.py#L131-L315"><code>display</code></a> function, and then closes all the figures, so matplotlib doesn&#8217;t end up littered will all the figures we&#8217;ve ever&nbsp;plotted.</p>
+<h2>Conclusion</h2>
+<p>To sum it up, use <code>%matplotlib</code> if you want interactive plotting with matplotlib. If you&#8217;re only interested in the <span class="caps">GUI</span>&#8217;s event loop, <code>%gui &lt;backend&gt;</code> is sufficient._ Although as far as I understand, there&#8217;s nothing very wrong with using <code>%matplotlib</code> all the&nbsp;time.</p>
+<div class="footnote">
+<hr>
+<ol>
+<li id="fn-matlab">
+<p>Basically, no namespaces, and direct access to functions like <code>plot</code>, <code>figure</code>, <code>subplot</code>, etc.&#160;<a class="footnote-backref" href="#fnref-matlab" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn-pylab">
+<p>The earliest commit I found for the IPyhon project was on July 6, 2005 by Fernando Perez, 7 months after the name change. Its Git hash is <a href="https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799">6f629fcc23ba63342548f61cc7307eeef4f55799</a>. But the earliest mention is an <a href="https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R955">August 2004 entry in the ChangeLog</a>: &#8220;ipythonrc-pylab: Add matplotlib support,&#8221; which is <em>before</em> the offical rename in matplotlib.&#160;<a class="footnote-backref" href="#fnref-pylab" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+    </article>
+</div>
+
+            <hr>
+<div class="article-content">
+    <article>
+        <h1 class="article-title">
+            <a href="https://alexchabot.net/2018/07/14/manually-merging-day-one-journals/">Manually Merging Day One Journals</a>
+        </h1>
+
+        <div class="meta">
+        <time datetime="2018-07-14 00:00:00-05:00">2018-07-14</time> by <span class="author">Alexandre Chabot-Leclerc</span>
+        </div>
+        <p>My first Day One entry is from January 24, 2012. I used it often to take
+note about what I was doing during my PhD with the <code>#wwid</code> tag (what was I
+doing, an idea from <a href="http://brettterpstra.com/">Brett Terpstra</a>, I think), and
+sometimes to clarify some&nbsp;thoughts.</p>
+<p>When Day One went The Way of the Subscription, I didn&#8217;t bother too much
+because Dropbox sync still worked. Until it didn&#8217;t. I somehow didn&#8217;t realized
+it and kept adding entries to both the iOS <em>and</em> the macOS versions. Not
+good. It&#8217;s been on my to do list for a while to find a way to merge the two
+journals. I could probably subscribe to the Day One sync service and have it
+figure out the merging but I didn&#8217;t want to subscribe just for&nbsp;that.</p>
+<p>I learned somewhere that Day One 2 could export journals as a folder of photos
+and a <span class="caps">JSON</span> file. I figure I could probably write a script to do the merging.
+So I downloaded Day One 2 on my iPhone and Mac, imported my Day One Classic
+journals, exported them as <span class="caps">JSON</span> to a folder on my Mac, and unzipped them. I
+also created a <code>merged/</code> folder where to put the merged journal. The hierarchy
+looks like&nbsp;this:</p>
+<div class="highlight"><pre><span></span>$ tree -L <span class="m">2</span>
 .
 ├── Journal-JSON-ios/
 │   ├── Journal.json
@@ -10,32 +302,92 @@
 ├── Journal-JSON-mac.zip
 ├── merge_journals.py
 └── merged/
-</pre></div><p>I first copied the photo folder from <code>Journal-JSON-ios/</code> to <code>merged/</code> and the photos from <code>Journal-JSON-mac/photos/</code>. I was pretty confident that I would end up with the union of all the photos because Day One uses <a href=https://en.wikipedia.org/wiki/Universally_unique_identifier>UUIDs</a> to identify each photo. The <code>-n</code> option to <code>cp</code> prevents overwriting&nbsp;files.</p><div class=highlight><pre><span></span>$ cp -r Journal-JSON-ios/photos merged/
+</pre></div>
+
+
+<p>I first copied the photo folder from <code>Journal-JSON-ios/</code> to <code>merged/</code>
+and the photos from <code>Journal-JSON-mac/photos/</code>. I was pretty confident
+that I would end up with the union of all the photos because Day One uses
+<a href="https://en.wikipedia.org/wiki/Universally_unique_identifier">UUIDs</a> to
+identify each photo. The <code>-n</code> option to <code>cp</code> prevents overwriting&nbsp;files.</p>
+<div class="highlight"><pre><span></span>$ cp -r Journal-JSON-ios/photos merged/
 $ cp -n Journal-JSON-mac/photos merged/photos/
-</pre></div><p>I then ran the <code>merge_journals.py</code> script (below) to do a similar merge of the entries, based on the UUIDs. The merging happens by building a dictionary with <span class=caps>UUID</span> of each entry as the key and the entry itself as the value. It&#8217;s two loops over the iOS and the macOS entries. Entries with the same <span class=caps>UUID</span> should have the same contents, unless I&#8217;ve edited some metadata on one platform but not the other. I&#8217;m not too worried about&nbsp;that.</p><p>The output dictionary will be written to the <code>Journal.json</code> file. The entries are sorted chronologically because that&#8217;s how it was in the exported journal files, but I doubt it&nbsp;matters.</p><p>The <code>output</code> dictionary is written to disk without enforcing the conversion to <span class=caps>ASCII</span> since the exported journals are encoded using <span class=caps>UTF</span>-8. The indent is there to make the output more readable and diff-able with the exported&nbsp;journals.</p><div class=highlight><pre><span></span><span class=kn>import</span> <span class=nn>json</span>
+</pre></div>
 
-<span class=k>with</span> <span class=nb>open</span><span class=p>(</span><span class=s1>&#39;./Journal-JSON-ios/Journal.json&#39;</span><span class=p>)</span> <span class=k>as</span> <span class=n>f</span><span class=p>:</span>
-    <span class=n>ios</span> <span class=o>=</span> <span class=n>json</span><span class=o>.</span><span class=n>load</span><span class=p>(</span><span class=n>f</span><span class=p>)</span>
-<span class=k>with</span> <span class=nb>open</span><span class=p>(</span><span class=s1>&#39;./Journal-JSON-mac/Journal.json&#39;</span><span class=p>)</span> <span class=k>as</span> <span class=n>f</span><span class=p>:</span>
-    <span class=n>mac</span> <span class=o>=</span> <span class=n>json</span><span class=o>.</span><span class=n>load</span><span class=p>(</span><span class=n>f</span><span class=p>)</span>
 
-<span class=c1># Extract and merge UUIDs</span>
-<span class=n>uniques</span> <span class=o>=</span> <span class=p>{</span><span class=n>entry</span><span class=p>[</span><span class=s1>&#39;uuid&#39;</span><span class=p>]:</span> <span class=n>entry</span> <span class=k>for</span> <span class=n>entry</span> <span class=ow>in</span> <span class=n>ios</span><span class=p>[</span><span class=s1>&#39;entries&#39;</span><span class=p>]}</span>
-<span class=k>for</span> <span class=n>entry</span> <span class=ow>in</span> <span class=n>mac</span><span class=p>[</span><span class=s1>&#39;entries&#39;</span><span class=p>]:</span>
-    <span class=n>uniques</span><span class=p>[</span><span class=n>entry</span><span class=p>[</span><span class=s1>&#39;uuid&#39;</span><span class=p>]]</span> <span class=o>=</span> <span class=n>entry</span>
+<p>I then ran the <code>merge_journals.py</code> script (below) to do a similar merge of the
+entries, based on the UUIDs. The merging happens by building a dictionary with
+<span class="caps">UUID</span> of each entry as the key and the entry itself as the value. It&#8217;s two
+loops over the iOS and the macOS entries. Entries with the same <span class="caps">UUID</span> should
+have the same contents, unless I&#8217;ve edited some metadata on one platform but
+not the other. I&#8217;m not too worried about&nbsp;that.</p>
+<p>The output dictionary will be written to the <code>Journal.json</code> file. The entries
+are sorted chronologically because that&#8217;s how it was in the exported journal
+files, but I doubt it&nbsp;matters.</p>
+<p>The <code>output</code> dictionary is written to disk without enforcing the conversion to
+<span class="caps">ASCII</span> since the exported journals are encoded using <span class="caps">UTF</span>-8. The indent is there
+to make the output more readable and diff-able with the exported&nbsp;journals.</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">json</span>
 
-<span class=c1># Create the output JSON data structure</span>
-<span class=n>output</span> <span class=o>=</span> <span class=p>{}</span>
-<span class=n>output</span><span class=p>[</span><span class=s1>&#39;metadata&#39;</span><span class=p>]</span> <span class=o>=</span> <span class=n>mac</span><span class=p>[</span><span class=s1>&#39;metadata&#39;</span><span class=p>]</span>
-<span class=n>output</span><span class=p>[</span><span class=s1>&#39;entries&#39;</span><span class=p>]</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>uniques</span><span class=o>.</span><span class=n>values</span><span class=p>())</span>
-<span class=c1># I&#39;m not sure it matters, but Day One usually exports the entries</span>
-<span class=c1># in chronological order</span>
-<span class=n>output</span><span class=p>[</span><span class=s1>&#39;entries&#39;</span><span class=p>]</span><span class=o>.</span><span class=n>sort</span><span class=p>(</span><span class=n>key</span><span class=o>=</span><span class=k>lambda</span> <span class=n>e</span><span class=p>:</span> <span class=n>e</span><span class=p>[</span><span class=s1>&#39;creationDate&#39;</span><span class=p>])</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;./Journal-JSON-ios/Journal.json&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">ios</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;./Journal-JSON-mac/Journal.json&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">mac</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 
-<span class=c1># ensure_ascii print unicode characters as-is.</span>
-<span class=k>with</span> <span class=nb>open</span><span class=p>(</span><span class=s1>&#39;merged/Journal.json&#39;</span><span class=p>,</span> <span class=s1>&#39;w&#39;</span><span class=p>,</span> <span class=n>encoding</span><span class=o>=</span><span class=s1>&#39;utf-8&#39;</span><span class=p>)</span> <span class=k>as</span> <span class=n>f</span><span class=p>:</span>
-    <span class=n>json</span><span class=o>.</span><span class=n>dump</span><span class=p>(</span><span class=n>output</span><span class=p>,</span> <span class=n>f</span><span class=p>,</span> <span class=n>indent</span><span class=o>=</span><span class=bp>True</span><span class=p>,</span> <span class=n>ensure_ascii</span><span class=o>=</span><span class=bp>False</span><span class=p>)</span>
-</pre></div><p>The last step is to zip the journal and photos together, which tripped me up a few times. The <code>Journal.json</code> and the <code>photos/</code> folder must be at the top level of the archive, so I zip the file from within the <code>merged/</code> folder and then move it back up one&nbsp;level.</p><div class=highlight><pre><span></span>$ <span class=nb>cd</span> merged
+<span class="c1"># Extract and merge UUIDs</span>
+<span class="n">uniques</span> <span class="o">=</span> <span class="p">{</span><span class="n">entry</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">]:</span> <span class="n">entry</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">ios</span><span class="p">[</span><span class="s1">&#39;entries&#39;</span><span class="p">]}</span>
+<span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">mac</span><span class="p">[</span><span class="s1">&#39;entries&#39;</span><span class="p">]:</span>
+    <span class="n">uniques</span><span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="s1">&#39;uuid&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">entry</span>
+
+<span class="c1"># Create the output JSON data structure</span>
+<span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">output</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mac</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+<span class="n">output</span><span class="p">[</span><span class="s1">&#39;entries&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">uniques</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+<span class="c1"># I&#39;m not sure it matters, but Day One usually exports the entries</span>
+<span class="c1"># in chronological order</span>
+<span class="n">output</span><span class="p">[</span><span class="s1">&#39;entries&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span><span class="p">[</span><span class="s1">&#39;creationDate&#39;</span><span class="p">])</span>
+
+<span class="c1"># ensure_ascii print unicode characters as-is.</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;merged/Journal.json&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+</pre></div>
+
+
+<p>The last step is to zip the journal and photos together, which tripped me up
+a few times. The <code>Journal.json</code> and the <code>photos/</code> folder must be at the top
+level of the archive, so I zip the file from within the <code>merged/</code> folder and
+then move it back up one&nbsp;level.</p>
+<div class="highlight"><pre><span></span>$ <span class="nb">cd</span> merged
 $ zip -r merged.zip *
 $ mv merged.zip ..
-</pre></div><p>I could then import <code>merged.zip</code> in Day One, which created a new Journal, and delete the old&nbsp;one.</p><p>I guess I could somewhat automate this to roll my own, <span class=caps>DIY</span>, sync between versions of Day One, but I&#8217;d rather pay them money once I decide to use Day One frequently again. Still, I really appreciate that the Day One developers picked formats that could be manipulated so&nbsp;easily.</p></article></div></div><hr id=hr-footer><footer><span id=left-footer><a href=http://creativecommons.org/licenses/by/4.0/ rel=license><img alt="Creative Commons License" style=border-width:0 src=https://i.creativecommons.org/l/by/4.0/80x15.png></a><br>This work is licensed under a <a href=http://creativecommons.org/licenses/by/4.0/ rel=license>Creative Commons Attribution 4.0 International License</a>. </span><span id=right-footer><a href=https://twitter.com/AlexChabotL>Twitter</a><a href=https://github.com/achabotl>GitHub</a><a href=/feeds/atom.xml>RSS</a></span></footer></div></body></html>
+</pre></div>
+
+
+<p>I could then import <code>merged.zip</code> in Day One, which created a new Journal, and
+delete the old&nbsp;one.</p>
+<p>I guess I could somewhat automate this to roll my own, <span class="caps">DIY</span>, sync between
+versions of Day One, but I&#8217;d rather pay them money once I decide to use Day
+One frequently again. Still, I really appreciate that the Day One developers
+picked formats that could be manipulated so&nbsp;easily.</p>
+    </article>
+</div>
+
+
+
+        </div>
+
+        <hr id="hr-footer">
+        <footer><span id="left-footer">
+    <a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/80x15.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International License</a>.
+</span>
+<span id="right-footer">
+        <a href="https://twitter.com/AlexChabotL">Twitter</a>
+    
+        <a href="https://github.com/achabotl">GitHub</a>
+
+<a href="/feeds/atom.xml">RSS</a>
+</span></footer>
+    </div>
+
+</body>
+</html>

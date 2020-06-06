@@ -1,5 +1,155 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Shredded Bits</title><link href="https://alexchabot.net/" rel="alternate"></link><link href="https://alexchabot.net/feeds/atom.xml" rel="self"></link><id>https://alexchabot.net/</id><updated>2020-05-31T00:00:00-05:00</updated><entry><title>What does %matplotlib do in IPython</title><link href="https://alexchabot.net/2020/05/31/what-does-matplotlib-do-in-ipython/" rel="alternate"></link><published>2020-05-31T00:00:00-05:00</published><updated>2020-05-31T00:00:00-05:00</updated><author><name>Alexandre Chabot-Leclerc</name></author><id>tag:alexchabot.net,2020-05-31:/2020/05/31/what-does-matplotlib-do-in-ipython/</id><summary type="html"></summary><content type="html">&lt;p&gt;&lt;em&gt;&lt;span class="caps"&gt;TLDR&lt;/span&gt;; Use &lt;code&gt;%matplotlib&lt;/code&gt; if you want interactive plotting with matplotlib. If you&amp;#8217;re only interested in the &lt;span class="caps"&gt;GUI&lt;/span&gt;&amp;#8217;s event loop, &lt;code&gt;%gui &amp;lt;backend&amp;gt;&lt;/code&gt; is&amp;nbsp;sufficient.&lt;/em&gt;&lt;/p&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Shredded Bits</title><link href="https://alexchabot.net/" rel="alternate"></link><link href="https://alexchabot.net/feeds/atom.xml" rel="self"></link><id>https://alexchabot.net/</id><updated>2020-06-06T00:00:00-05:00</updated><entry><title>Custom URL Handler for Zettels with Unique IDs</title><link href="https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels-with-unique-ids/" rel="alternate"></link><published>2020-06-06T00:00:00-05:00</published><updated>2020-06-06T00:00:00-05:00</updated><author><name>Alexandre Chabot-Leclerc</name></author><id>tag:alexchabot.net,2020-06-06:/2020/06/06/custom-url-handler-for-zettels-with-unique-ids/</id><summary type="html"></summary><content type="html">&lt;p&gt;Yesterday I read a &lt;a href="https://forum.zettelkasten.de/discussion/comment/5609/"&gt;series&lt;/a&gt; &lt;a href="https://forum.zettelkasten.de/discussion/1121/open-files-in-any-app-from-the-archive-using-url-schemes"&gt;of&lt;/a&gt; &lt;a href="https://forum.zettelkasten.de/discussion/1152/using-a-custom-url-handler-on-macos-for-any-scripting-purpose"&gt;posts&lt;/a&gt; on custom &lt;span class="caps"&gt;URL&lt;/span&gt; scheme handlers on the &lt;a href="https://forum.zettelkasten.de"&gt;Zettelkasten forums&lt;/a&gt;. The handler registers itself to open links like &lt;code&gt;zettel://202006061337&lt;/code&gt;, where the number is the unique &lt;span class="caps"&gt;ID&lt;/span&gt; of a zettel (here it&amp;#8217;s a timestamp). I&amp;#8217;m not sure everyone realized the magnitude of what that&amp;nbsp;means. &lt;/p&gt;
+&lt;p&gt;Combining a custom &lt;span class="caps"&gt;URL&lt;/span&gt; with a unique &lt;span class="caps"&gt;ID&lt;/span&gt; means notes and links can become &lt;em&gt;entirely independent from your apps&lt;/em&gt;. Only the handler needs to know about the apps you&amp;#8217;re&amp;nbsp;using. &lt;/p&gt;
+&lt;p&gt;That alone is very nice, but then I thought: URLs can have query parameters… That means I can have URLs like &lt;code&gt;zettel://202006061337&amp;amp;edit&lt;/code&gt; that open in my text editor of choice: &lt;a href="https://macromates.com/"&gt;TextMate&lt;/a&gt;, &lt;a href="https://www.barebones.com/products/bbedit"&gt;BBEdit&lt;/a&gt;, &lt;a href="http://www.hogbaysoftware.com/products/writeroom"&gt;WriteRoom&lt;/a&gt;, &lt;a href="http://www.foldingtext.com/"&gt;FoldingText&lt;/a&gt;, etc. Or &lt;code&gt;zettel://202006061337&amp;amp;preview&lt;/code&gt; to open in &lt;a href="https://marked2app.com/"&gt;Marked&lt;/a&gt;. Or I could even pick the app interactively with &lt;code&gt;zettel://202006061337&amp;amp;pick&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Handling the &lt;span class="caps"&gt;ID&lt;/span&gt; alone is pretty easy since the common Zettelkasten-like apps respond to a &lt;span class="caps"&gt;URL&lt;/span&gt; scheme to search and open files. &lt;a href="https://zettelkasten.de/the-archive/help/#how-do-i-link-to-notes-from-other-apps"&gt;The Archive&lt;/a&gt; uses &lt;code&gt;thearchive://match/ID&lt;/code&gt;, &lt;a href="https://nvultra.com/help/advanced-features#urlhandler"&gt;nvUltra&lt;/a&gt; uses &lt;code&gt;x-nvultra://find/ID&lt;/code&gt;, and &lt;a href="https://brettterpstra.com/2012/02/02/connecting-nvalt-and-address-book/"&gt;nvAlt&lt;/a&gt; uses &lt;code&gt;nvalt://find/ID&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;But how to open in a text editor or in Marked given only the &lt;span class="caps"&gt;ID&lt;/span&gt;? With Spotlight. I used &lt;code&gt;mdfind -name ID&lt;/code&gt; to find the file. This could be further refined with the &lt;code&gt;-onlyin FOLDER&lt;/code&gt; option but I didn&amp;#8217;t need it. Then it&amp;#8217;s a matter of calling &lt;code&gt;open -a Marked FILEPATH&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;There&amp;#8217;s also a &lt;code&gt;zettel://create&lt;/code&gt; special case that will create a new zettel with the current time stamp (&lt;span class="caps"&gt;YYYYMMDDHHMM&lt;/span&gt;). It&amp;#8217;s always done with the default Zettelkasten app because the script doesn&amp;#8217;t know where to write the file but the app&amp;nbsp;does.&lt;/p&gt;
+&lt;p&gt;I wrote the handler in Applecript because it&amp;#8217;s the easiest way I know to create something that macOS considers an &amp;#8220;app&amp;#8221; and that can therefore handle&amp;nbsp;URLs. &lt;/p&gt;
+&lt;p&gt;The full script is below. To use&amp;nbsp;it:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Open Script Editor and paste the code below in a new&amp;nbsp;file.&lt;/li&gt;
+&lt;li&gt;[Optional] Modify values in the Configuration section to pick a different &lt;span class="caps"&gt;URL&lt;/span&gt; prefix, default Zettelkasten app &lt;span class="caps"&gt;URL&lt;/span&gt;, editor, and previewer. You can add as many apps as you&amp;#8217;d like in the &lt;code&gt;appChoices&lt;/code&gt; array.&lt;/li&gt;
+&lt;li&gt;Save as &amp;#8220;Application&amp;#8221;. You can save it anywhere. Make sure &lt;a href="https://apple.stackexchange.com/questions/245772/how-to-get-rid-of-applescript-confirmation"&gt;none of the boxes are checked&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Register the app as a &lt;span class="caps"&gt;URL&lt;/span&gt; handler. You can do it with the &lt;a href="https://github.com/Lord-Kamina/SwiftDefaultApps"&gt;SwiftDefaultApps&lt;/a&gt; Preference pane, or using the instructions provided by Christian Tietze &lt;a href="https://forum.zettelkasten.de/discussion/comment/6133/#Comment_6133"&gt;in the forums&lt;/a&gt;:&lt;ul&gt;
+&lt;li&gt;Locate the application file you just&amp;nbsp;created&lt;/li&gt;
+&lt;li&gt;Right-click the app, select &amp;#8220;Show Package&amp;nbsp;Contents&amp;#8221;&lt;/li&gt;
+&lt;li&gt;Inside, open &lt;code&gt;Contents/Info.plist&lt;/code&gt; &lt;em&gt;with a text&amp;nbsp;editor&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;Paste the following in a blank line right below the &lt;code&gt;&amp;lt;dict&amp;gt;&lt;/code&gt; line. Replace &lt;code&gt;zettel&lt;/code&gt; with the &lt;span class="caps"&gt;URL&lt;/span&gt; prefix you&amp;#8217;ve&amp;nbsp;chosen:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="nt"&gt;&amp;lt;key&amp;gt;&lt;/span&gt;CFBundleURLTypes&lt;span class="nt"&gt;&amp;lt;/key&amp;gt;&lt;/span&gt;
+&lt;span class="nt"&gt;&amp;lt;array&amp;gt;&lt;/span&gt;
+    &lt;span class="nt"&gt;&amp;lt;dict&amp;gt;&lt;/span&gt;
+        &lt;span class="nt"&gt;&amp;lt;key&amp;gt;&lt;/span&gt;CFBundleURLName&lt;span class="nt"&gt;&amp;lt;/key&amp;gt;&lt;/span&gt;
+        &lt;span class="nt"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;Zettel Link Opener&lt;span class="nt"&gt;&amp;lt;/string&amp;gt;&lt;/span&gt;
+        &lt;span class="nt"&gt;&amp;lt;key&amp;gt;&lt;/span&gt;CFBundleURLSchemes&lt;span class="nt"&gt;&amp;lt;/key&amp;gt;&lt;/span&gt;
+        &lt;span class="nt"&gt;&amp;lt;array&amp;gt;&lt;/span&gt;
+            &lt;span class="nt"&gt;&amp;lt;string&amp;gt;&lt;/span&gt;zettel&lt;span class="nt"&gt;&amp;lt;/string&amp;gt;&lt;/span&gt;
+        &lt;span class="nt"&gt;&amp;lt;/array&amp;gt;&lt;/span&gt;
+    &lt;span class="nt"&gt;&amp;lt;/dict&amp;gt;&lt;/span&gt;
+&lt;span class="nt"&gt;&amp;lt;/array&amp;gt;&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;Here&amp;#8217;s the full&amp;nbsp;script:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="c"&gt;-- Zettel Link Opener&lt;/span&gt;
+&lt;span class="c"&gt;-- Created by Alexandre Chabot-Leclerc&lt;/span&gt;
+&lt;span class="c"&gt;-- Source: https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels/&lt;/span&gt;
+&lt;span class="c"&gt;-- URL Handler for zettelkasten unique IDs, e.g., zettel://202006061017&lt;/span&gt;
+&lt;span class="c"&gt;-- Handles options after the ID to open different apps:&lt;/span&gt;
+&lt;span class="c"&gt;--    zettel://202006061017&amp;amp;edit to open is a text editor like TextMate&lt;/span&gt;
+&lt;span class="c"&gt;--    zettel://202006061017&amp;amp;preview to open in a preview app like Marked&lt;/span&gt;
+&lt;span class="c"&gt;--    zettel://202006061017&amp;amp;pick to open a menu of apps to pick from&lt;/span&gt;
+
+&lt;span class="c"&gt;-----------------------------------------------------------&lt;/span&gt;
+&lt;span class="c"&gt;-- CONFIGURATION&lt;/span&gt;
+&lt;span class="c"&gt;-- URL prefix for your custom URL, e.g. zettel://ZETTEL_ID&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;urlPrefix&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;zettel&amp;quot;&lt;/span&gt;
+
+&lt;span class="c"&gt;-- Default URL to call to open a note with a given ID. The ID will be appended&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;defaultZkAppUrl&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;thearchive://match/&amp;quot;&lt;/span&gt;
+&lt;span class="c"&gt;--property defaultZkAppUrl : &amp;quot;nvalt://find/&amp;quot;&lt;/span&gt;
+&lt;span class="c"&gt;--property defaultZkAppUrl : &amp;quot;x-nvultra://find/&amp;quot;&lt;/span&gt;
+
+&lt;span class="c"&gt;-- URL to use to create a new zettle with the current timestamp YYYYMMDDHHMM&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;urlForCreation&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;thearchive://matchOrCreate/&amp;quot;&lt;/span&gt;
+&lt;span class="c"&gt;--property urlForCreation : &amp;quot;nvalt://make?txt=&amp;quot;&lt;/span&gt;
+&lt;span class="c"&gt;--property urlForCreation : &amp;quot;x-nvultra://make?txt=&amp;quot;&lt;/span&gt;
+
+&lt;span class="c"&gt;-- Apps to use for the different query parameters&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;editApp&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;FoldingText&amp;quot;&lt;/span&gt; &lt;span class="c"&gt;-- App to used with &amp;quot;&amp;amp;edit&amp;quot; query parameter&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;previewApp&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;Marked&amp;quot;&lt;/span&gt; &lt;span class="c"&gt;-- App to used with &amp;quot;&amp;amp;preview&amp;quot; query parameter &lt;/span&gt;
+
+&lt;span class="c"&gt;-- List of app to display in the menu with with &amp;amp;pick query option&lt;/span&gt;
+&lt;span class="c"&gt;-- The apps will appear in the order defined here&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;appChoices&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;&lt;span class="nv"&gt;defaultZkAppUrl&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nv"&gt;editApp&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nv"&gt;previewApp&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;TextMate&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="k"&gt;property&lt;/span&gt; &lt;span class="nv"&gt;defaultApp&lt;/span&gt; &lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;&lt;span class="nv"&gt;defaultZkAppUrl&lt;/span&gt;&lt;span class="p"&gt;})&lt;/span&gt;
+&lt;span class="c"&gt;-----------------------------------------------------------&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nv"&gt;splitText&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;theText&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nv"&gt;theDelimiter&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="no"&gt;AppleScript&lt;/span&gt;&amp;#39;s &lt;span class="no"&gt;text item delimiters&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nv"&gt;theDelimiter&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;theTextItems&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nb"&gt;every&lt;/span&gt; &lt;span class="nb"&gt;text&lt;/span&gt; &lt;span class="nb"&gt;item&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;theText&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="no"&gt;AppleScript&lt;/span&gt;&amp;#39;s &lt;span class="no"&gt;text item delimiters&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;&amp;quot;&lt;/span&gt;
+    &lt;span class="no"&gt;return&lt;/span&gt; &lt;span class="nv"&gt;theTextItems&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nv"&gt;splitText&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nv"&gt;removeUrlPrefix&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;original&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="c"&gt;-- Remove URL prefix so we&amp;#39;re left with only the ID and the optional query parameter&lt;/span&gt;
+    &lt;span class="no"&gt;return&lt;/span&gt; &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;echo &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nb"&gt;quoted form&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;original&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot; | sed &amp;#39;s;&amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;urlPrefix&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;://;;&amp;#39;&amp;quot;&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nv"&gt;removeUrlPrefix&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nv"&gt;getIdAndOption&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;resouceAndQuery&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="c"&gt;-- Split the zettel ID and the optional parameter&lt;/span&gt;
+    &lt;span class="c"&gt;-- For example 202006061012&amp;amp;edit or 202006061012&amp;amp;preview&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;theItems&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nv"&gt;splitText&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;resouceAndQuery&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;&amp;amp;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nv"&gt;length&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;theItems&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="c"&gt;-- Append an empty string if there&amp;#39;s no option so this&lt;/span&gt;
+        &lt;span class="c"&gt;-- function always returns an array of 2 elements&lt;/span&gt;
+        &lt;span class="nb"&gt;copy&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;&amp;quot;&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nb"&gt;the&lt;/span&gt; &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;theItems&lt;/span&gt;
+    &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt;
+    &lt;span class="no"&gt;return&lt;/span&gt; &lt;span class="nv"&gt;theItems&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nv"&gt;getIdAndOption&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nv"&gt;findFilepath&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;zk_id&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="c"&gt;-- Finds the filepath using Spotlight.&lt;/span&gt;
+    &lt;span class="c"&gt;-- It&amp;#39;s easier than finding the proper filename given only the zettel ID&lt;/span&gt;
+    &lt;span class="no"&gt;return&lt;/span&gt; &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;mdfind -name &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;zk_id&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nv"&gt;findFilepath&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nv"&gt;createZettel&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;newZkId&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;date +&amp;#39;%Y%m%d%H%M&amp;#39;&amp;quot;&lt;/span&gt;
+    &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;open &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;urlForCreation&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;newZkId&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nv"&gt;createZettel&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nv"&gt;openInChoosenApp&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;zkId&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nv"&gt;zkFilepath&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="c"&gt;--  From Simple List Handler by Patrick Welker &amp;lt;http://rocketink.net&amp;gt;&lt;/span&gt;
+    &lt;span class="c"&gt;-- Promp the use for the app to use&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;selectedApp&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nb"&gt;item&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;choose from list&lt;/span&gt; &lt;span class="nb"&gt;the&lt;/span&gt; &lt;span class="nv"&gt;appChoices&lt;/span&gt; &lt;span class="nv"&gt;with&lt;/span&gt; &lt;span class="na"&gt;title&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;Available App&amp;quot;&lt;/span&gt; &lt;span class="nv"&gt;with&lt;/span&gt; &lt;span class="na"&gt;prompt&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;Which app do you want to use?&amp;quot;&lt;/span&gt; &lt;span class="nv"&gt;default&lt;/span&gt; &lt;span class="nb"&gt;items&lt;/span&gt; &lt;span class="nv"&gt;defaultApp&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nv"&gt;selectedApp&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="no"&gt;false&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="c"&gt;-- Exit prematurly if the user clicked Cancel&lt;/span&gt;
+        &lt;span class="k"&gt;error&lt;/span&gt; &lt;span class="nv"&gt;number&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;128&lt;/span&gt;
+    &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt;
+
+    &lt;span class="c"&gt;-- Open the URL directly, or open by app name&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nv"&gt;selectedApp&lt;/span&gt; &lt;span class="ow"&gt;contains&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;://&amp;quot;&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;open &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;selectedApp&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;zkId&lt;/span&gt;
+    &lt;span class="k"&gt;else&lt;/span&gt;
+        &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;open -a &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;selectedApp&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot; &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nb"&gt;quoted form&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;zkFilepath&lt;/span&gt;
+    &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nv"&gt;openInChoosenApp&lt;/span&gt;
+
+&lt;span class="k"&gt;on&lt;/span&gt; &lt;span class="nb"&gt;open location&lt;/span&gt; &lt;span class="nv"&gt;thisURL&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;resouceAndQuery&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nv"&gt;removeUrlPrefix&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;thisURL&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;idAndOption&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nv"&gt;getIdAndOption&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;resouceAndQuery&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;zkId&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nb"&gt;item&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;idAndOption&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nv"&gt;zkId&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;create&amp;quot;&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="nv"&gt;createZettel&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+        &lt;span class="no"&gt;return&lt;/span&gt;
+    &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt;
+
+    &lt;span class="k"&gt;set&lt;/span&gt; &lt;span class="nv"&gt;zkFilepath&lt;/span&gt; &lt;span class="k"&gt;to&lt;/span&gt; &lt;span class="nv"&gt;findFilepath&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;zkId&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nb"&gt;item&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;idAndOption&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;edit&amp;quot;&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;open -a &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;editApp&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot; &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nb"&gt;quoted form&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;zkFilepath&lt;/span&gt;
+        &lt;span class="c"&gt;-- Exit the script immediately so we don&amp;#39;t also open in the default app&lt;/span&gt;
+        &lt;span class="no"&gt;return&lt;/span&gt;
+    &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nb"&gt;item&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;idAndOption&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;preview&amp;quot;&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;open -a &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;previewApp&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot; &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nb"&gt;quoted form&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;zkFilepath&lt;/span&gt;
+        &lt;span class="c"&gt;-- Exit the script immediately so we don&amp;#39;t also open in the default app(&lt;/span&gt;
+        &lt;span class="no"&gt;return&lt;/span&gt;
+    &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="nb"&gt;item&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt; &lt;span class="k"&gt;of&lt;/span&gt; &lt;span class="nv"&gt;idAndOption&lt;/span&gt; &lt;span class="ow"&gt;is&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;pick&amp;quot;&lt;/span&gt; &lt;span class="k"&gt;then&lt;/span&gt;
+        &lt;span class="nv"&gt;openInChoosenApp&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nv"&gt;zkId&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nv"&gt;zkFilepath&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="no"&gt;return&lt;/span&gt;
+    &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="k"&gt;if&lt;/span&gt;
+
+    &lt;span class="c"&gt;-- Fall back to the default handler if there was no option&lt;/span&gt;
+    &lt;span class="c"&gt;-- or the option was invalid&lt;/span&gt;
+    &lt;span class="nb"&gt;do shell script&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;open &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;defaultZkAppUrl&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="nv"&gt;zkId&lt;/span&gt;
+&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="nb"&gt;open location&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;</content><category term="applescript"></category><category term="zettelkasten"></category></entry><entry><title>What does %matplotlib do in IPython</title><link href="https://alexchabot.net/2020/05/31/what-does-matplotlib-do-in-ipython/" rel="alternate"></link><published>2020-05-31T00:00:00-05:00</published><updated>2020-05-31T00:00:00-05:00</updated><author><name>Alexandre Chabot-Leclerc</name></author><id>tag:alexchabot.net,2020-05-31:/2020/05/31/what-does-matplotlib-do-in-ipython/</id><summary type="html"></summary><content type="html">&lt;p&gt;&lt;em&gt;&lt;span class="caps"&gt;TLDR&lt;/span&gt;; Use &lt;code&gt;%matplotlib&lt;/code&gt; if you want interactive plotting with matplotlib. If you&amp;#8217;re only interested in the &lt;span class="caps"&gt;GUI&lt;/span&gt;&amp;#8217;s event loop, &lt;code&gt;%gui &amp;lt;backend&amp;gt;&lt;/code&gt; is&amp;nbsp;sufficient.&lt;/em&gt;&lt;/p&gt;
 &lt;p&gt;I never really understood the difference between &lt;code&gt;%gui&lt;/code&gt; and &lt;code&gt;%matplotlib&lt;/code&gt; in IPython. One of my colleagues at Enthought once told me that at some point in his career, he more or less stopped reading documentation and instead went straight to the code. That&amp;#8217;s what I did here. But let&amp;#8217;s do a bit of history&amp;nbsp;first.&lt;/p&gt;
 &lt;p&gt;In the &amp;#8220;beginning&amp;#8221;, there was &lt;code&gt;pylab&lt;/code&gt;. It (still) is a module of matplotlib and was a flag to IPython designed to &lt;a href="https://web.archive.org/web/20130609145008/https://wiki.scipy.org/PyLab"&gt;facilitate the adoption of Python as a numerical computing language&lt;/a&gt; by providing a &lt;span class="caps"&gt;MATLAB&lt;/span&gt;-like syntax.&lt;sup id="fnref-matlab"&gt;&lt;a class="footnote-ref" href="#fn-matlab"&gt;1&lt;/a&gt;&lt;/sup&gt; The reference was so explicit that before being renamed to &lt;code&gt;pylab&lt;/code&gt; on &lt;a href="https://github.com/matplotlib/matplotlib/commit/f210efb0aff44a108239496c877aefe6b7cab2e5"&gt;Dec 9, 2004&lt;/a&gt;, the module was called &lt;code&gt;matplotlib.matlab&lt;/code&gt;. IPython adopted the rename on the &lt;a href="https://github.com/ipython/ipython/commit/6f629fcc23ba63342548f61cc7307eeef4f55799#diff-f26cfac88f7acfeb30807d9a98cff722R616"&gt;same day&lt;/a&gt;.&lt;sup id="fnref-pylab"&gt;&lt;a class="footnote-ref" href="#fn-pylab"&gt;2&lt;/a&gt;&lt;/sup&gt; With the &lt;code&gt;‑‑pylab&lt;/code&gt; flag or the &lt;code&gt;%pylab&lt;/code&gt; magic function, IPython would set up matplotlib for interactive plotting and executed a number of imports from IPython, NumPy and matplotlib. Even thought it helped a few people transition to Python (including myself), it turned out to be a pretty bad idea from a usability point of view. Matthias Bussonnier wrote up a good list of the many things that are wrong with it in &amp;#8220;&lt;a href="https://matthiasbussonnier.com/posts/10-No-PyLab-Thanks.html"&gt;No Pylab Thanks&lt;/a&gt;.&amp;#8221;&lt;/p&gt;
 &lt;p&gt;For the 1.0.0 release of IPython in August 2013, all mentions of &lt;code&gt;%pylab&lt;/code&gt; were removed from the examples (in a &lt;a href="https://github.com/ipython/ipython/pull/3683"&gt;July 18, 2013&lt;/a&gt; commit) and were replaced by calls to the &lt;code&gt;%matplotlib&lt;/code&gt; magic function, which only enables interactive plotting but does not perform any imports. The &lt;code&gt;%matplotlib&lt;/code&gt; function had already been introduced in a &lt;a href="https://github.com/ipython/ipython/commit/7ae1fe4225c0c11ccdd6eec758c23aa81ac88654"&gt;2013 refactoring&lt;/a&gt; to separate the interatice plotting from the imports. The &lt;code&gt;%gui&lt;/code&gt; magic command had already been &lt;a href="https://github.com/ipython/ipython/commit/a38045e05d22fee06a56ae884856ed689523ff7b"&gt;introduced&lt;/a&gt; in 2009 by Brian Granger to &amp;#8220;manage the events loops&amp;#8221; (hint&amp;nbsp;hint).&lt;/p&gt;

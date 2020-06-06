@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>popthings: Import TaskPaper template into Things | Shredded Bits </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/theme/css/style.min.css?38704cca">
+    <link rel="canonical" href="https://alexchabot.net/drafts/popthings-taskpaper-things-template.html"/>
+</head>
+<body>
+
+    <div id="main">
+
+        <header><h1 id="site-name"><a href="/">Shredded Bits</a></h1></header>
+        <hr>
+        <nav><ul class="navbar" id="left-navbar">
+        <li><a href="/about">About</a></li>
+        <li><a href="/projects">Projects</a></li>
+        <li><a href="/archives">Archives</a></li>
+
+
+
+</ul>
+
+<ul class="navbar" id="right-navbar">
+</ul></nav>
+        <hr id="hr-nav">
+
+        <div id="content">
+
+<div class="article-content">
+    <article>
+        <h1 class="article-title">
+            <a href="https://alexchabot.net/drafts/popthings-taskpaper-things-template.html">popthings: Import TaskPaper template into Things</a>
+        </h1>
+
+        <div class="meta">
+        <time datetime="2020-05-31 00:00:00-05:00">2020-05-31</time> by <span class="author">Alexandre Chabot-Leclerc</span>
+        </div>
+        <p>As far as I can remember, Things was the first to-do app I used on the Mac, sometime around 2008. The year before, I had been introduced to Getting Things Done and 43 Folders by my internship supervisor and Things seemed like the best tool for the job. I synced the Mac app with my shiny new iPod Touch for years, until I switched to OmniFocus around 2009-2010. I switched partially because of syncing (like basically everyone else), but also because of so many great resources, such as Mac Power Users and Shawn Blanc’s seminal (to me at least) article <a href="https://shawnblanc.net/2010/10/omnifocus/">A Sledgehammer Called OmniFocus</a>. There was a short stint during my PhD where I used <a href="http://www.spootnik.net">Spootnik</a> to access my OmniFocus database because I was using Linux, and then eventually used <a href="https://taskwarrior.org">TaskWarrior</a> to sync between my computers.<sup id="fnref-1"><a class="footnote-ref" href="#fn-1">1</a></sup> I also used TaskPaper on the side for various things. I read and <a href="http://www.nerdsondraft.com/">listened</a> attentively to <a href="http://www.macdrifter.com/2014/01/deconstructing-my-omnifocus-dependency.html">Gabe Weatherhead’s</a> and <a href="http://technologynotes.net">Jeff Hunsberger’s</a> adventures with the TaskPaper Lifestyle. Control and “simplicity” appealed to me, but thankfully, by the time I was ready to implement an (insane) TaskPaper system, Cultured Code announced that Things 3 was imminent. This was the first time I put an alert in my calendar for the release of a to-do app. (Any app, now that I think of it.) After a few months of <a href="http://www.nerdsondraft.com/podcast/2018/1/12/mighty-things-3">listening</a> and <a href="https://www.macstories.net/reviews/things-3-beauty-and-delight-in-a-task-manager/">reading</a> <a href="http://www.macdrifter.com/2018/02/things-3-from-an-omnifocus-and-taskpaper-user.html">reviews</a>, I switched to Things&nbsp;3. </p>
+<p>My life is not particularly repetitive, but I still relied heavily on Curt Clifton’s <a href="http://curtclifton.net/poptemp">Populate Template Placeholders</a> script when using OmniFocus. I teach Python to scientists and engineers for <a href="https://www.enthought.com/training">work</a>, and I need the same checklist and packing list for each class. Templating with dates is the thing I missed the most when I switched to Things 3. Federico built an impressive <a href="https://www.macstories.net/ios/things-automation-building-a-natural-language-parser-in-workflow/">Text to Things parser</a> in Workflow that could be used as a replacement, but 1) I work mainly on the Mac, 2) the complexity of the Workflow boggles my mind, even as a programmer, and 3) I want to use a TaskPaper template, not some custom syntax. The <a href="https://github.com/dansays/thingy">Thingy</a> project by Dan Budiac is equally impressive but also uses it’s own syntax (with emojis!). I’m aware of the <a href="https://github.com/AlexanderWillner/things.sh">things.sh</a> project too, which is also great. But again, I want to use the TaskPaper format, not Markdown. So of course, I made my&nbsp;own.</p>
+<p>The brief&nbsp;was:</p>
+<ul>
+<li>Use the TaskPaper format as&nbsp;input</li>
+<li>Allow for placeholder&nbsp;replacement</li>
+<li>Let me to set start and due dates using regular TaskPaper tags (<code>@start</code>, <code>@due</code>)</li>
+<li>Pass through other tags to&nbsp;Things</li>
+<li>Support all the Things item types: projects, headers, to-do items, checklist items, and notes on projects and to-do&nbsp;items</li>
+<li>Be written in a language (Python) that I know and can&nbsp;maintain</li>
+</ul>
+<p>Let’s start with the payoff and see it in action. On the iPad, the script is executed by Pythonista and I can either trigger it via the Share&nbsp;sheet:</p>
+<p><img alt="Triggering the extension using the Share sheet" src=""></p>
+<p>Or I can trigger from the Today widget, which prompts me to pick a template using the Files&nbsp;picker:</p>
+<p><img alt="Triggering the extension using the Today widget" src=""></p>
+<p>On the Mac, I call it from the Terminal for now, but I’ll probably create a Keyboard Maestro palette to pick from a selection of&nbsp;templates:</p>
+<div class="highlight"><pre><span></span>$ popthings ~/Dropbox/Notes/templatex-travel.taskpaper
+Start date? <span class="m">2020</span>-09-01
+Due date? <span class="m">2020</span>-10-12
+</pre></div>
+
+
+<h2>Code&nbsp;Walkthrough</h2>
+<p>In good <a href="http://leancrew.com/all-this/">Dr. Drang</a> fashion, here’s a walkthrough of the script. But because it’s quite long, I’m breaking it apart into topical sections instead of covering it line by line. This means that a class is sometimes split over multiple sections, but I think it still makes sense. This of it like broken <a href="https://en.wikipedia.org/wiki/Literate_programming">literate programming</a>. I’ve omitted all the docstrings to save some space. But fear not, everything is documented in the <a href="https://github.com/achabotl/popthings">actual script</a>. Let’s start from the top function and drill down as&nbsp;necessary. </p>
+<h3>The&nbsp;&#8220;Main&#8221;</h3>
+<p>The <code>taskpaper_to_things</code> function is the entry point given the content of a TaskPaper document. How we get the content depends on the platform and the input method. We’ll get to that towards the end of the article. Then we create a proper <code>things:///json</code> <span class="caps">URL</span> and open&nbsp;it:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">taskpaper_to_things</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">things_json</span> <span class="o">=</span> <span class="n">taskpaper_template_to_things_json</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="n">build_things_url</span><span class="p">(</span><span class="n">things_json</span><span class="p">)</span>
+    <span class="n">webbrowser</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+</pre></div>
+
+
+<p>All the interesting stuff happens in the <code>taskpaper_template_to_things_json</code> function. First, we build the TaskPaper document <a href="https://en.m.wikipedia.org/wiki/Tree_(data_structure)">tree</a>. The Taskpaper tree doesn’t know anything about Things and its types. I plan on reusing that code for other TaskPaper-related projects. Then, we build a list of Things objects, of Projects in fact, using <code>things_objects_from_taskpaper_tree</code>. The last line converts each object to its <span class="caps">JSON</span>&nbsp;representation.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">taskpaper_template_to_things_json</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">build_taskpaper_document_tree</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="n">things_objs</span> <span class="o">=</span> <span class="n">things_objects_from_taskpaper_tree</span><span class="p">(</span><span class="n">tree</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">things_objs</span><span class="p">]</span>
+</pre></div>
+
+
+<p>The <code>build_things_url</code> function converts the <code>things_json</code> list of dictionaries into a <a href="https://support.culturedcode.com/customer/en/portal/articles/2803573"><span class="caps">URL</span> that Things understands</a>.  Passing the separators manually to <code>json.dumps</code> prevents the insertion of spaces around these symbols, and <code>urllib.parse.quote</code> makes sure the content of the <code>data</code> <span class="caps">URL</span> parameter is correctly&nbsp;escaped.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_things_url</span><span class="p">(</span><span class="n">things_json</span><span class="p">):</span>
+    <span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">things_json</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="s1">&#39;:&#39;</span><span class="p">))</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;things:///json?data={}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">quote</span><span class="p">(</span><span class="n">json_str</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">url</span>
+</pre></div>
+
+
+<h3>Building the TaskPaper&nbsp;Tree</h3>
+<p>I don’t think the <a href="https://github.com/jessegrosjean/birch-outline">official TaskPaper parser</a> builds a tree from the document, nor does Rob Trew in his <a href="https://github.com/RobTrew/tree-tools">tree-tools</a> project. I’m sure Jesse Grosjean has a good reason not to, but that’s what made the most sense to me since, well, and outline is a tree. The tree is made of <code>TPNode</code> objects. Each node stores the entire <code>line</code>, the <code>text</code> without tags, trailing &#8220;:&#8221; or &#8220;- &#8221; prefix, and the <code>indent</code> as an integer. The indent is essential to construct and traverse the tree. The <code>type</code> is one of project, task, note, or empty. The <code>line_number</code> is optional and not particularly useful to me right now. The <code>tags</code> is a list of <code>(tag_name, tag_value)</code> tuples. The <code>__repr__</code> method gives a readable representation of the node when&nbsp;debugging.</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">TPNode</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">indent</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="n">line_number</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">line</span> <span class="o">=</span> <span class="n">line</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">text</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">indent</span> <span class="o">=</span> <span class="n">indent</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="nb">type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">line_number</span> <span class="o">=</span> <span class="n">line_number</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tags</span> <span class="o">=</span> <span class="n">tags</span> <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parent</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s1">&#39;TPNode({self.text!r}, type={self.type!r},&#39;</span>
+                <span class="s1">&#39;tags={self.tags}, indent={self.indent})&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
+</pre></div>
+
+
+<p>The <code>from_line</code> method (below) is where all the object creation logic happens. Using class methods is a common pattern to implement alternative constructors. Unlike regular methods, they can be called on the class itself (<code>TPNode</code>) before it is instantiated. First, we strip the tags from the line and parse them immediately. Then, we go through an annoying tree of <code>if/else</code> and regular expressions to identify the type of each line. Towards the end, I use the <em>named groups</em> feature of regular expressions to fetch the indent and the text. It’s much more readable than <code>match.group(0)</code>. The named group is the <code>?P&lt;NAME&gt;</code> part of the capturing group in&nbsp;parentheses.</p>
+<p>The <code>strip_tags</code> function uses the not-often-used <code>partition</code> method on strings, which has the neat property of always splitting the string in three. If the separator isn’t found, the second and third return values (<code>sep</code> and <code>tags_text</code> here) are empty&nbsp;strings.</p>
+<p>The <code>find_tags</code> function uses the <code>finditer</code> method on the compiled regular expression to iterate over all the non-overlapping matches. That <code>PATTERN_TAG</code> regex<sup id="fnref-tree-tool-regex"><a class="footnote-ref" href="#fn-tree-tool-regex">2</a></sup> was too much for my brain so I used the <code>re.VERBOSE</code> flag to split it over multiple lines and use comments. Even then, it’s too much for my&nbsp;brain.</p>
+<div class="highlight"><pre><span></span><span class="n">PATTERN_PROJECT</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^(?P&lt;indent&gt;\t*)(\s*)(?P&lt;text&gt;[^-\s].*):$&#39;</span><span class="p">)</span>
+<span class="n">PATTERN_TASK</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^(?P&lt;indent&gt;\t*)(-\s(?P&lt;text&gt;.*))$&#39;</span><span class="p">)</span>
+<span class="n">PATTERN_NOTE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(?P&lt;indent&gt;\t*)(?P&lt;text&gt;[^\t]*.*)$&#39;</span><span class="p">)</span>
+<span class="n">PATTERN_TAG</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;&quot;&quot;(?:^|\s+)@             # space and @ before tag</span>
+<span class="s2">                             (?P&lt;name&gt;\w+)          # the tag name</span>
+<span class="s2">                             (?:\(                  # don&#39;t capture the ()</span>
+<span class="s2">                                 (?P&lt;value&gt;[^\)]*)  # the tag value, if any</span>
+<span class="s2">                                 \)                 # close the () pair</span>
+<span class="s2">                                 )?                 # the value is optional</span>
+<span class="s2">                             (?=\s|$)               # lookahead, match if</span>
+<span class="s2">                                                    # space or EOL</span>
+<span class="s2">                             &quot;&quot;&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">TPNode</span><span class="p">:</span>
+    <span class="o">...</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_line</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">line</span><span class="p">,</span> <span class="n">line_number</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="n">text_without_tags</span><span class="p">,</span> <span class="n">tags_text</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">strip_tags</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">find_tags</span><span class="p">(</span><span class="n">tags_text</span><span class="p">)</span>
+
+        <span class="n">match</span> <span class="o">=</span> <span class="n">PATTERN_PROJECT</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">text_without_tags</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+            <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;project&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">PATTERN_TASK</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">text_without_tags</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;task&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">PATTERN_NOTE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">text_without_tags</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;text&#39;</span><span class="p">):</span>
+                        <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;note&#39;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;empty&#39;</span>
+        <span class="n">indent</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;indent&#39;</span><span class="p">))</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;text&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">TPNode</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">indent</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="n">line_number</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="n">tags</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">strip_tags</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">line</span><span class="p">):</span>
+        <span class="n">text_without_tags</span><span class="p">,</span> <span class="n">sep</span><span class="p">,</span> <span class="n">tags_text</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s1">&#39; @&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sep</span><span class="p">:</span>
+            <span class="n">text_without_tags</span> <span class="o">=</span> <span class="n">text_without_tags</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">text_without_tags</span><span class="p">,</span> <span class="n">sep</span> <span class="o">+</span> <span class="n">tags_text</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">find_tags</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">PATTERN_TAG</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+            <span class="n">tags</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tag</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">),</span> <span class="n">tag</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">tags</span>
+</pre></div>
+
+
+<p>We can then build the document tree using the <code>build_taskpaper_document_tree</code> function. First we parse each line into a list of <code>TPNode</code> objects. The <code>root</code> node has a different <em>type</em> than everything else, and a negative indent, because an indent of 0 is a top-level node. Then we iterate through each node and inspect its indent and the previous node&#8217;s indent. The tricky condition is when a node has a smaller indent than the previous one. In that case, we go up the tree of the previus node until we reach node that&#8217;s one level higher than the current one, and add the current node as a&nbsp;child.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_taskpaper_document_tree</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">TPNode</span><span class="o">.</span><span class="n">from_line</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">line_number</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">line_number</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">())</span>
+    <span class="p">]</span>
+
+    <span class="n">root</span> <span class="o">=</span> <span class="n">TPNode</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;root&#39;</span><span class="p">)</span>
+    <span class="n">previous_node</span> <span class="o">=</span> <span class="n">root</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">indent</span> <span class="o">==</span> <span class="n">previous_node</span><span class="o">.</span><span class="n">indent</span><span class="p">:</span>
+            <span class="n">previous_node</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">add_child</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">indent</span> <span class="o">&gt;</span> <span class="n">previous_node</span><span class="o">.</span><span class="n">indent</span><span class="p">:</span>
+            <span class="n">previous_node</span><span class="o">.</span><span class="n">add_child</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">indent</span> <span class="o">&lt;</span> <span class="n">previous_node</span><span class="o">.</span><span class="n">indent</span><span class="p">:</span>
+            <span class="c1"># Find the parent whose indent difference is 1 and add sister</span>
+            <span class="n">previous_parent</span> <span class="o">=</span> <span class="n">previous_node</span>
+            <span class="k">while</span> <span class="n">node</span><span class="o">.</span><span class="n">indent</span> <span class="o">&lt;=</span> <span class="n">previous_parent</span><span class="o">.</span><span class="n">indent</span><span class="p">:</span>
+                <span class="n">previous_parent</span> <span class="o">=</span> <span class="n">previous_parent</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">previous_parent</span><span class="o">.</span><span class="n">add_child</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="n">previous_node</span> <span class="o">=</span> <span class="n">node</span>
+    <span class="k">return</span> <span class="n">root</span>
+
+
+<span class="k">class</span> <span class="nc">TPNode</span><span class="p">:</span>
+    <span class="o">...</span>
+    <span class="k">def</span> <span class="nf">add_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">parent</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Add the end, we return the <code>root</code> of our TaskPaper&nbsp;tree.</p>
+<p>I addition to the standard node methods, I added a handful of others to simplify working with the TaskPaper structure. It&#8217;s easy to verify types with <code>is_*</code> methods, to flatten the tree (actually a <a href="https://en.wikipedia.org/wiki/Depth-first_search">depth-first traversal</a>) and to check if the task has a parent of type&nbsp;&#8220;project&#8221;.</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">TPNode</span><span class="p">:</span>
+    <span class="o">...</span>
+    <span class="k">def</span> <span class="nf">is_project</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;project&#39;</span>
+
+    <span class="k">def</span> <span class="nf">is_task</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;task&#39;</span>
+
+    <span class="k">def</span> <span class="nf">is_note</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;note&#39;</span>
+
+    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;empty&#39;</span>
+
+    <span class="k">def</span> <span class="nf">is_root</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s1">&#39;root&#39;</span>
+
+    <span class="k">def</span> <span class="nf">flatten</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">flattened</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s1">&#39;root&#39;</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+            <span class="n">flattened</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">child</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">flattened</span>
+
+    <span class="k">def</span> <span class="nf">has_project_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span>
+        <span class="k">if</span> <span class="n">parent</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">while</span> <span class="ow">not</span> <span class="n">parent</span><span class="o">.</span><span class="n">is_project</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">parent</span><span class="o">.</span><span class="n">is_root</span><span class="p">():</span>
+                <span class="k">return</span> <span class="bp">False</span>
+            <span class="n">parent</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">parent</span>
+        <span class="k">return</span> <span class="bp">True</span>
+</pre></div>
+
+
+<h3>Defining the Things&nbsp;Types</h3>
+<p>I defined 5 types to represent Things objects, <code>ThingsToDo</code>, <code>ThingsProject</code>, <code>ThingsHeading</code>, <code>ThingsChecklistItem</code> and <code>ThingsNode</code>. These objects encapsulate the logic requirend to build the Things &#8220;tree&#8221; and to convert each object to <span class="caps">JSON</span>. The base class for each Things type is a <code>ThingsObject</code>. Once again, I use a class method, <code>from_tp_node</code> as the alternate constructor to return the appropriate type based on the <code>TPNode</code> type:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">ThingsObject</span><span class="p">:</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="bp">None</span>    
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">title</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_attrs_mapping</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_tp_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node</span> <span class="o">=</span> <span class="n">node</span>
+        <span class="n">special_tags</span><span class="p">,</span> <span class="n">regular_tags</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_split_special_tags</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">tags</span><span class="p">)</span>
+        <span class="n">special_tags_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">special_tags</span><span class="p">}</span>
+        <span class="n">tags_str</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">regular_tags</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_project</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ThingsProject</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="n">tags_str</span><span class="p">,</span> <span class="o">**</span><span class="n">special_tags_dict</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_heading</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ThingsHeading</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_todo</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ThingsToDo</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="n">tags_str</span><span class="p">,</span> <span class="o">**</span><span class="n">special_tags_dict</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_checklist_item</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ThingsChecklistItem</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_note</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ThingsNote</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Node type not recognised.&quot;</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+</pre></div>
+
+
+<p>This allows some type definitions to be&nbsp;simple:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">ThingsHeading</span><span class="p">(</span><span class="n">ThingsObject</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;heading&#39;</span>
+
+
+<span class="k">class</span> <span class="nc">ThingsChecklistItem</span><span class="p">(</span><span class="n">ThingsObject</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;checklist-item&#39;</span>
+
+
+<span class="k">class</span> <span class="nc">ThingsNote</span><span class="p">(</span><span class="n">ThingsObject</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;note&#39;</span>
+</pre></div>
+
+
+<p>But it&#8217;s not as easy for the <code>ThingsToDo</code> and the <code>ThingsProject</code> because in addition to a title, they can also have notes, items, tags, a start date and a deadline. In order to manage that, there&#8217;s a second base class, for those two types, <code>_ThingsRichObject</code>, which adds the necessary attributes, as well as a <code>add_note</code> method:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">_ThingsRichObject</span><span class="p">(</span><span class="n">ThingsObject</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">notes</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">when</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">deadline</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">_ThingsRichObject</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">notes</span> <span class="o">=</span> <span class="n">notes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">when</span> <span class="o">=</span> <span class="n">when</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">deadline</span> <span class="o">=</span> <span class="n">deadline</span>
+        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">tags</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tags</span> <span class="o">=</span> <span class="n">tags</span>
+        <span class="c1"># Mapping between Python attribute names and JSON keys.</span>
+        <span class="n">attrs_mapping</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;notes&#39;</span><span class="p">:</span> <span class="s1">&#39;notes&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;when&#39;</span><span class="p">:</span> <span class="s1">&#39;when&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;deadline&#39;</span><span class="p">:</span> <span class="s1">&#39;deadline&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;tags&#39;</span><span class="p">:</span> <span class="s1">&#39;tags&#39;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_attrs_mapping</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">attrs_mapping</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">add_note</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">notes</span><span class="p">:</span>
+            <span class="n">note_text</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">{node.title}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node</span><span class="o">=</span><span class="n">node</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">note_text</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">title</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">notes</span> <span class="o">+=</span> <span class="n">note_text</span>
+</pre></div>
+
+
+<p>The <code>ThingsToDo</code> inherits from it and adds a checklist and and <code>add_checklist</code> method:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">ThingsToDo</span><span class="p">(</span><span class="n">_ThingsRichObject</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;to-do&#39;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">notes</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">when</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">deadline</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">checklist_items</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ThingsToDo</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">title</span><span class="p">,</span> <span class="n">notes</span><span class="o">=</span><span class="n">notes</span><span class="p">,</span> <span class="n">when</span><span class="o">=</span><span class="n">when</span><span class="p">,</span> <span class="n">deadline</span><span class="o">=</span><span class="n">deadline</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="n">tags</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">checklist_items</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">checklist_items</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">checklist_items</span> <span class="o">=</span> <span class="n">checklist_items</span>
+
+    <span class="k">def</span> <span class="nf">add_checklist_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">checklist_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+</pre></div>
+
+
+<p>And <code>ThingsProject</code> adds items and an <code>add_items</code> method:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">ThingsProject</span><span class="p">(</span><span class="n">_ThingsRichObject</span><span class="p">):</span>
+    <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;project&#39;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">notes</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">when</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">deadline</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">area</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ThingsProject</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">title</span><span class="p">,</span> <span class="n">notes</span><span class="o">=</span><span class="n">notes</span><span class="p">,</span> <span class="n">when</span><span class="o">=</span><span class="n">when</span><span class="p">,</span> <span class="n">deadline</span><span class="o">=</span><span class="n">deadline</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="n">tags</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">items</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">items</span> <span class="o">=</span> <span class="n">items</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">area</span> <span class="o">=</span> <span class="n">area</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_attrs_mapping</span><span class="p">[</span><span class="s1">&#39;area&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;area&#39;</span>
+
+    <span class="k">def</span> <span class="nf">add_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+</pre></div>
+
+
+<h3>Converting the TaskPaper Tree to a Things&nbsp;Hierarchy</h3>
+<p>From the tree of <code>TPNodes</code>, I can build the hierarchie of Things objects. I made a strong assumption here: there <em>must</em> be a project at the top of the TaskPaper file, otherwise the logic to append items gets more complicated and I don&#8217;t plan on creating templates that are not projects. We iterate through each node of the flattened tree and add the things object at the right&nbsp;level:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">things_objects_from_taskpaper_tree</span><span class="p">(</span><span class="n">tree</span><span class="p">):</span>
+    <span class="n">things_nodes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">tp_node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">flatten</span><span class="p">():</span>
+        <span class="n">things_obj</span> <span class="o">=</span> <span class="n">ThingsObject</span><span class="o">.</span><span class="n">from_tp_node</span><span class="p">(</span><span class="n">tp_node</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">things_obj</span><span class="o">.</span><span class="n">is_project</span><span class="p">(</span><span class="n">tp_node</span><span class="p">):</span>
+            <span class="c1"># Add as top-level item in the list of things_nodes</span>
+            <span class="n">things_nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">things_obj</span><span class="p">)</span>
+            <span class="n">last_things_obj_accepting_notes</span> <span class="o">=</span> <span class="n">things_obj</span>
+        <span class="k">elif</span> <span class="n">things_obj</span><span class="o">.</span><span class="n">is_todo</span><span class="p">(</span><span class="n">tp_node</span><span class="p">):</span>
+            <span class="c1"># Add as regular item to most-recent project</span>
+            <span class="n">things_nodes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">things_obj</span><span class="p">)</span>
+            <span class="n">last_things_obj_accepting_notes</span> <span class="o">=</span> <span class="n">things_obj</span>
+        <span class="k">elif</span> <span class="n">things_obj</span><span class="o">.</span><span class="n">is_heading</span><span class="p">(</span><span class="n">tp_node</span><span class="p">):</span>
+            <span class="c1"># Add as regular item to most-recent project</span>
+            <span class="n">things_nodes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">things_obj</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">things_obj</span><span class="o">.</span><span class="n">is_checklist_item</span><span class="p">(</span><span class="n">tp_node</span><span class="p">):</span>
+            <span class="c1"># Add to most recent task of most recent project.</span>
+            <span class="n">things_nodes</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">add_checklist_item</span><span class="p">(</span><span class="n">things_obj</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">things_obj</span><span class="o">.</span><span class="n">is_note</span><span class="p">(</span><span class="n">tp_node</span><span class="p">):</span>
+            <span class="n">last_things_obj_accepting_notes</span><span class="o">.</span><span class="n">add_note</span><span class="p">(</span><span class="n">things_obj</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">things_nodes</span>
+</pre></div>
+
+
+<h3>Converting the Things Objects to <span class="caps">JSON</span></h3>
+<p>The conversion to <span class="caps">JSON</span> happens in the <code>taskpaper_template_to_things_json</code> function:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">taskpaper_template_to_things_json</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">build_taskpaper_document_tree</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="n">things_objs</span> <span class="o">=</span> <span class="n">things_objects_from_taskpaper_tree</span><span class="p">(</span><span class="n">tree</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">things_objs</span><span class="p">]</span>
+</pre></div>
+
+
+<p>Each Things object is responsible for its own conversion to <span class="caps">JSON</span>. The <code>ThingsHeading</code>, <code>ThingsChecklistItem</code> and <code>ThingsNote</code> types use the default method from <code>ThingsObject</code>. The tricky part was to only put in the <span class="caps">JSON</span> the attributes that Things knows about. This is done with the <code>_attrs_mapping</code> dictionary that maps between the attribute names on the Python side to the <span class="caps">JSON</span>&nbsp;keys:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">ThingsObject</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">title</span><span class="p">,}</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">obj_attr</span><span class="p">,</span> <span class="n">things_attr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attrs_mapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj_attr</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+                <span class="n">d</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">][</span><span class="n">things_attr</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">return</span> <span class="n">d</span>
+</pre></div>
+
+
+<p>The <code>ThingsToDo</code> and <code>ThingsProject</code> types need their own conversion to <span class="caps">JSON</span> to include checklist items for to-dos, and items for&nbsp;projects:</p>
+<div class="highlight"><pre><span></span><span class="kr">class</span> <span class="nx">ThingsToDo</span><span class="p">(</span><span class="nx">_ThingsRichObject</span><span class="p">)</span><span class="o">:</span>
+    <span class="nx">def</span> <span class="nx">to_json</span><span class="p">(</span><span class="nx">self</span><span class="p">)</span><span class="o">:</span>
+        <span class="nx">d</span> <span class="o">=</span> <span class="kr">super</span><span class="p">(</span><span class="nx">ThingsToDo</span><span class="p">,</span> <span class="nx">self</span><span class="p">).</span><span class="nx">to_json</span><span class="p">()</span>
+        <span class="nx">d</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">][</span><span class="s1">&#39;checklist-items&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="nx">item</span><span class="p">.</span><span class="nx">to_json</span><span class="p">()</span> <span class="k">for</span> <span class="nx">item</span> <span class="k">in</span> <span class="nx">self</span><span class="p">.</span><span class="nx">checklist_items</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="nx">d</span>
+
+<span class="kr">class</span> <span class="nx">ThingsProject</span><span class="p">(</span><span class="nx">_ThingsRichObject</span><span class="p">)</span><span class="o">:</span>
+    <span class="nx">def</span> <span class="nx">to_json</span><span class="p">(</span><span class="nx">self</span><span class="p">)</span><span class="o">:</span>
+        <span class="nx">d</span> <span class="o">=</span> <span class="kr">super</span><span class="p">(</span><span class="nx">ThingsProject</span><span class="p">,</span> <span class="nx">self</span><span class="p">).</span><span class="nx">to_json</span><span class="p">()</span>
+        <span class="nx">d</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">][</span><span class="s1">&#39;items&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="nx">item</span><span class="p">.</span><span class="nx">to_json</span><span class="p">()</span> <span class="k">for</span> <span class="nx">item</span> <span class="k">in</span> <span class="nx">self</span><span class="p">.</span><span class="nx">items</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="nx">d</span>
+</pre></div>
+
+
+<h3>Getting the Template&nbsp;Text</h3>
+<p>We get the text from the template using the <code>get_document(platform)</code> function. If it&#8217;s called from the terminal, it uses standard <code>argparse</code> to get the file name and offer proper&nbsp;help:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_document</span><span class="p">(</span><span class="n">platform</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="kn">import</span> <span class="nn">argparse</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawTextHelpFormatter</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;infile&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;path to taskpaper template&#39;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">infile</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+</pre></div>
+
+
+<p>On&nbsp;iOS, </p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_document</span><span class="p">(</span><span class="n">platform</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="c1"># If it&#39;s on iOS, get the text from the extension and get dates</span>
+    <span class="c1"># from pop ups.</span>
+    <span class="kn">import</span> <span class="nn">appex</span>
+    <span class="kn">import</span> <span class="nn">dialogs</span>
+
+    <span class="k">if</span> <span class="n">appex</span><span class="o">.</span><span class="n">is_running_extension</span><span class="p">():</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="n">appex</span><span class="o">.</span><span class="n">get_text</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Running either from the Today widget or from Pythonista</span>
+        <span class="n">infile</span> <span class="o">=</span> <span class="n">dialogs</span><span class="o">.</span><span class="n">pick_document</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">infile</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="c1"># User cancelled</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">infile</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">template</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+</pre></div>
+
+
+<h3>Know&nbsp;issues</h3>
+<ul>
+<li>Date picker on&nbsp;iOS</li>
+<li>Negative date&nbsp;offsets</li>
+<li>There must be a project at the top&nbsp;level</li>
+</ul>
+<div class="footnote">
+<hr>
+<ol>
+<li id="fn-1">
+<p>TaskWarrior is unbelievable nerdy and powerful, but I had just exchanged one pain for another. It synced between my Macs, but there was no iOS app. I still used OmniFocus for its inbox while on the go, and would manually add things to TaskWarrior. I don’t recommend that.&#160;<a class="footnote-backref" href="#fnref-1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn-tree-tool-regex">
+<p>From Rob Trew&#8217;s <a href="https://github.com/RobTrew/tree-tools">tree-tools</a>&#160;<a class="footnote-backref" href="#fnref-tree-tool-regex" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+<li id="fn-2">
+<p>The documentation specific to each function, method, class, etc.&#160;<a class="footnote-backref" href="#fnref-2" title="Jump back to footnote 3 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+    </article>
+</div>
+
+
+        </div>
+
+        <hr id="hr-footer">
+        <footer><span id="left-footer">
+    <a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/80x15.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International License</a>.
+</span>
+<span id="right-footer">
+        <a href="https://twitter.com/AlexChabotL">Twitter</a>
+    
+        <a href="https://github.com/achabotl">GitHub</a>
+
+<a href="/feeds/atom.xml">RSS</a>
+</span></footer>
+    </div>
+
+</body>
+</html>

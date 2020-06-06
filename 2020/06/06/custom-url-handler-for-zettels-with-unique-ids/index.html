@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>Custom URL Handler for Zettels with Unique IDs | Shredded Bits </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/theme/css/style.min.css?38704cca">
+    <link rel="canonical" href="https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels-with-unique-ids/"/>
+</head>
+<body>
+
+    <div id="main">
+
+        <header><h1 id="site-name"><a href="/">Shredded Bits</a></h1></header>
+        <hr>
+        <nav><ul class="navbar" id="left-navbar">
+        <li><a href="/about">About</a></li>
+        <li><a href="/projects">Projects</a></li>
+        <li><a href="/archives">Archives</a></li>
+
+
+
+</ul>
+
+<ul class="navbar" id="right-navbar">
+</ul></nav>
+        <hr id="hr-nav">
+
+        <div id="content">
+
+<div class="article-content">
+    <article>
+        <h1 class="article-title">
+            <a href="https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels-with-unique-ids/">Custom URL Handler for Zettels with Unique IDs</a>
+        </h1>
+
+        <div class="meta">
+        <time datetime="2020-06-06 00:00:00-05:00">2020-06-06</time> by <span class="author">Alexandre Chabot-Leclerc</span>
+        </div>
+        <p>Yesterday I read a <a href="https://forum.zettelkasten.de/discussion/comment/5609/">series</a> <a href="https://forum.zettelkasten.de/discussion/1121/open-files-in-any-app-from-the-archive-using-url-schemes">of</a> <a href="https://forum.zettelkasten.de/discussion/1152/using-a-custom-url-handler-on-macos-for-any-scripting-purpose">posts</a> on custom <span class="caps">URL</span> scheme handlers on the <a href="https://forum.zettelkasten.de">Zettelkasten forums</a>. The handler registers itself to open links like <code>zettel://202006061337</code>, where the number is the unique <span class="caps">ID</span> of a zettel (here it&#8217;s a timestamp). I&#8217;m not sure everyone realized the magnitude of what that&nbsp;means. </p>
+<p>Combining a custom <span class="caps">URL</span> with a unique <span class="caps">ID</span> means notes and links can become <em>entirely independent from your apps</em>. Only the handler needs to know about the apps you&#8217;re&nbsp;using. </p>
+<p>That alone is very nice, but then I thought: URLs can have query parameters… That means I can have URLs like <code>zettel://202006061337&amp;edit</code> that open in my text editor of choice: <a href="https://macromates.com/">TextMate</a>, <a href="https://www.barebones.com/products/bbedit">BBEdit</a>, <a href="http://www.hogbaysoftware.com/products/writeroom">WriteRoom</a>, <a href="http://www.foldingtext.com/">FoldingText</a>, etc. Or <code>zettel://202006061337&amp;preview</code> to open in <a href="https://marked2app.com/">Marked</a>. Or I could even pick the app interactively with <code>zettel://202006061337&amp;pick</code>.</p>
+<p>Handling the <span class="caps">ID</span> alone is pretty easy since the common Zettelkasten-like apps respond to a <span class="caps">URL</span> scheme to search and open files. <a href="https://zettelkasten.de/the-archive/help/#how-do-i-link-to-notes-from-other-apps">The Archive</a> uses <code>thearchive://match/ID</code>, <a href="https://nvultra.com/help/advanced-features#urlhandler">nvUltra</a> uses <code>x-nvultra://find/ID</code>, and <a href="https://brettterpstra.com/2012/02/02/connecting-nvalt-and-address-book/">nvAlt</a> uses <code>nvalt://find/ID</code>.</p>
+<p>But how to open in a text editor or in Marked given only the <span class="caps">ID</span>? With Spotlight. I used <code>mdfind -name ID</code> to find the file. This could be further refined with the <code>-onlyin FOLDER</code> option but I didn&#8217;t need it. Then it&#8217;s a matter of calling <code>open -a Marked FILEPATH</code>.</p>
+<p>There&#8217;s also a <code>zettel://create</code> special case that will create a new zettel with the current time stamp (<span class="caps">YYYYMMDDHHMM</span>). It&#8217;s always done with the default Zettelkasten app because the script doesn&#8217;t know where to write the file but the app&nbsp;does.</p>
+<p>I wrote the handler in Applecript because it&#8217;s the easiest way I know to create something that macOS considers an &#8220;app&#8221; and that can therefore handle&nbsp;URLs. </p>
+<p>The full script is below. To use&nbsp;it:</p>
+<ol>
+<li>Open Script Editor and paste the code below in a new&nbsp;file.</li>
+<li>[Optional] Modify values in the Configuration section to pick a different <span class="caps">URL</span> prefix, default Zettelkasten app <span class="caps">URL</span>, editor, and previewer. You can add as many apps as you&#8217;d like in the <code>appChoices</code> array.</li>
+<li>Save as &#8220;Application&#8221;. You can save it anywhere. Make sure <a href="https://apple.stackexchange.com/questions/245772/how-to-get-rid-of-applescript-confirmation">none of the boxes are checked</a>.</li>
+<li>Register the app as a <span class="caps">URL</span> handler. You can do it with the <a href="https://github.com/Lord-Kamina/SwiftDefaultApps">SwiftDefaultApps</a> Preference pane, or using the instructions provided by Christian Tietze <a href="https://forum.zettelkasten.de/discussion/comment/6133/#Comment_6133">in the forums</a>:<ul>
+<li>Locate the application file you just&nbsp;created</li>
+<li>Right-click the app, select &#8220;Show Package&nbsp;Contents&#8221;</li>
+<li>Inside, open <code>Contents/Info.plist</code> <em>with a text&nbsp;editor</em></li>
+<li>Paste the following in a blank line right below the <code>&lt;dict&gt;</code> line. Replace <code>zettel</code> with the <span class="caps">URL</span> prefix you&#8217;ve&nbsp;chosen:</li>
+</ul>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><span class="nt">&lt;key&gt;</span>CFBundleURLTypes<span class="nt">&lt;/key&gt;</span>
+<span class="nt">&lt;array&gt;</span>
+    <span class="nt">&lt;dict&gt;</span>
+        <span class="nt">&lt;key&gt;</span>CFBundleURLName<span class="nt">&lt;/key&gt;</span>
+        <span class="nt">&lt;string&gt;</span>Zettel Link Opener<span class="nt">&lt;/string&gt;</span>
+        <span class="nt">&lt;key&gt;</span>CFBundleURLSchemes<span class="nt">&lt;/key&gt;</span>
+        <span class="nt">&lt;array&gt;</span>
+            <span class="nt">&lt;string&gt;</span>zettel<span class="nt">&lt;/string&gt;</span>
+        <span class="nt">&lt;/array&gt;</span>
+    <span class="nt">&lt;/dict&gt;</span>
+<span class="nt">&lt;/array&gt;</span>
+</pre></div>
+
+
+<p>Here&#8217;s the full&nbsp;script:</p>
+<div class="highlight"><pre><span></span><span class="c">-- Zettel Link Opener</span>
+<span class="c">-- Created by Alexandre Chabot-Leclerc</span>
+<span class="c">-- Source: https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels/</span>
+<span class="c">-- URL Handler for zettelkasten unique IDs, e.g., zettel://202006061017</span>
+<span class="c">-- Handles options after the ID to open different apps:</span>
+<span class="c">--    zettel://202006061017&amp;edit to open is a text editor like TextMate</span>
+<span class="c">--    zettel://202006061017&amp;preview to open in a preview app like Marked</span>
+<span class="c">--    zettel://202006061017&amp;pick to open a menu of apps to pick from</span>
+
+<span class="c">-----------------------------------------------------------</span>
+<span class="c">-- CONFIGURATION</span>
+<span class="c">-- URL prefix for your custom URL, e.g. zettel://ZETTEL_ID</span>
+<span class="k">property</span> <span class="nv">urlPrefix</span> <span class="p">:</span> <span class="s2">&quot;zettel&quot;</span>
+
+<span class="c">-- Default URL to call to open a note with a given ID. The ID will be appended</span>
+<span class="k">property</span> <span class="nv">defaultZkAppUrl</span> <span class="p">:</span> <span class="s2">&quot;thearchive://match/&quot;</span>
+<span class="c">--property defaultZkAppUrl : &quot;nvalt://find/&quot;</span>
+<span class="c">--property defaultZkAppUrl : &quot;x-nvultra://find/&quot;</span>
+
+<span class="c">-- URL to use to create a new zettle with the current timestamp YYYYMMDDHHMM</span>
+<span class="k">property</span> <span class="nv">urlForCreation</span> <span class="p">:</span> <span class="s2">&quot;thearchive://matchOrCreate/&quot;</span>
+<span class="c">--property urlForCreation : &quot;nvalt://make?txt=&quot;</span>
+<span class="c">--property urlForCreation : &quot;x-nvultra://make?txt=&quot;</span>
+
+<span class="c">-- Apps to use for the different query parameters</span>
+<span class="k">property</span> <span class="nv">editApp</span> <span class="p">:</span> <span class="s2">&quot;FoldingText&quot;</span> <span class="c">-- App to used with &quot;&amp;edit&quot; query parameter</span>
+<span class="k">property</span> <span class="nv">previewApp</span> <span class="p">:</span> <span class="s2">&quot;Marked&quot;</span> <span class="c">-- App to used with &quot;&amp;preview&quot; query parameter </span>
+
+<span class="c">-- List of app to display in the menu with with &amp;pick query option</span>
+<span class="c">-- The apps will appear in the order defined here</span>
+<span class="k">property</span> <span class="nv">appChoices</span> <span class="p">:</span> <span class="p">{</span><span class="nv">defaultZkAppUrl</span><span class="p">,</span> <span class="nv">editApp</span><span class="p">,</span> <span class="nv">previewApp</span><span class="p">,</span> <span class="s2">&quot;TextMate&quot;</span><span class="p">}</span>
+<span class="k">property</span> <span class="nv">defaultApp</span> <span class="p">:</span> <span class="p">{</span><span class="nv">defaultZkAppUrl</span><span class="p">})</span>
+<span class="c">-----------------------------------------------------------</span>
+
+<span class="k">on</span> <span class="nv">splitText</span><span class="p">(</span><span class="nv">theText</span><span class="p">,</span> <span class="nv">theDelimiter</span><span class="p">)</span>
+    <span class="k">set</span> <span class="no">AppleScript</span>&#39;s <span class="no">text item delimiters</span> <span class="k">to</span> <span class="nv">theDelimiter</span>
+    <span class="k">set</span> <span class="nv">theTextItems</span> <span class="k">to</span> <span class="nb">every</span> <span class="nb">text</span> <span class="nb">item</span> <span class="k">of</span> <span class="nv">theText</span>
+    <span class="k">set</span> <span class="no">AppleScript</span>&#39;s <span class="no">text item delimiters</span> <span class="k">to</span> <span class="s2">&quot;&quot;</span>
+    <span class="no">return</span> <span class="nv">theTextItems</span>
+<span class="k">end</span> <span class="nv">splitText</span>
+
+<span class="k">on</span> <span class="nv">removeUrlPrefix</span><span class="p">(</span><span class="nv">original</span><span class="p">)</span>
+    <span class="c">-- Remove URL prefix so we&#39;re left with only the ID and the optional query parameter</span>
+    <span class="no">return</span> <span class="nb">do shell script</span> <span class="s2">&quot;echo &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">original</span> <span class="o">&amp;</span> <span class="s2">&quot; | sed &#39;s;&quot;</span> <span class="o">&amp;</span> <span class="nv">urlPrefix</span> <span class="o">&amp;</span> <span class="s2">&quot;://;;&#39;&quot;</span>
+<span class="k">end</span> <span class="nv">removeUrlPrefix</span>
+
+<span class="k">on</span> <span class="nv">getIdAndOption</span><span class="p">(</span><span class="nv">resouceAndQuery</span><span class="p">)</span>
+    <span class="c">-- Split the zettel ID and the optional parameter</span>
+    <span class="c">-- For example 202006061012&amp;edit or 202006061012&amp;preview</span>
+    <span class="k">set</span> <span class="nv">theItems</span> <span class="k">to</span> <span class="nv">splitText</span><span class="p">(</span><span class="nv">resouceAndQuery</span><span class="p">,</span> <span class="s2">&quot;&amp;&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nv">length</span> <span class="k">of</span> <span class="nv">theItems</span> <span class="ow">is</span> <span class="mi">1</span> <span class="k">then</span>
+        <span class="c">-- Append an empty string if there&#39;s no option so this</span>
+        <span class="c">-- function always returns an array of 2 elements</span>
+        <span class="nb">copy</span> <span class="s2">&quot;&quot;</span> <span class="k">to</span> <span class="nb">the</span> <span class="k">end</span> <span class="k">of</span> <span class="nv">theItems</span>
+    <span class="k">end</span> <span class="k">if</span>
+    <span class="no">return</span> <span class="nv">theItems</span>
+<span class="k">end</span> <span class="nv">getIdAndOption</span>
+
+<span class="k">on</span> <span class="nv">findFilepath</span><span class="p">(</span><span class="nv">zk_id</span><span class="p">)</span>
+    <span class="c">-- Finds the filepath using Spotlight.</span>
+    <span class="c">-- It&#39;s easier than finding the proper filename given only the zettel ID</span>
+    <span class="no">return</span> <span class="nb">do shell script</span> <span class="s2">&quot;mdfind -name &quot;</span> <span class="o">&amp;</span> <span class="nv">zk_id</span>
+<span class="k">end</span> <span class="nv">findFilepath</span>
+
+<span class="k">on</span> <span class="nv">createZettel</span><span class="p">()</span>
+    <span class="k">set</span> <span class="nv">newZkId</span> <span class="k">to</span> <span class="nb">do shell script</span> <span class="s2">&quot;date +&#39;%Y%m%d%H%M&#39;&quot;</span>
+    <span class="nb">do shell script</span> <span class="s2">&quot;open &quot;</span> <span class="o">&amp;</span> <span class="nv">urlForCreation</span> <span class="o">&amp;</span> <span class="nv">newZkId</span>
+<span class="k">end</span> <span class="nv">createZettel</span>
+
+<span class="k">on</span> <span class="nv">openInChoosenApp</span><span class="p">(</span><span class="nv">zkId</span><span class="p">,</span> <span class="nv">zkFilepath</span><span class="p">)</span>
+    <span class="c">--  From Simple List Handler by Patrick Welker &lt;http://rocketink.net&gt;</span>
+    <span class="c">-- Promp the use for the app to use</span>
+    <span class="k">set</span> <span class="nv">selectedApp</span> <span class="k">to</span> <span class="nb">item</span> <span class="mi">1</span> <span class="k">of</span> <span class="p">(</span><span class="nb">choose from list</span> <span class="nb">the</span> <span class="nv">appChoices</span> <span class="nv">with</span> <span class="na">title</span> <span class="s2">&quot;Available App&quot;</span> <span class="nv">with</span> <span class="na">prompt</span> <span class="s2">&quot;Which app do you want to use?&quot;</span> <span class="nv">default</span> <span class="nb">items</span> <span class="nv">defaultApp</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nv">selectedApp</span> <span class="ow">is</span> <span class="no">false</span> <span class="k">then</span>
+        <span class="c">-- Exit prematurly if the user clicked Cancel</span>
+        <span class="k">error</span> <span class="nv">number</span> <span class="o">-</span><span class="mi">128</span>
+    <span class="k">end</span> <span class="k">if</span>
+
+    <span class="c">-- Open the URL directly, or open by app name</span>
+    <span class="k">if</span> <span class="nv">selectedApp</span> <span class="ow">contains</span> <span class="s2">&quot;://&quot;</span> <span class="k">then</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open &quot;</span> <span class="o">&amp;</span> <span class="nv">selectedApp</span> <span class="o">&amp;</span> <span class="nv">zkId</span>
+    <span class="k">else</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open -a &quot;</span> <span class="o">&amp;</span> <span class="nv">selectedApp</span> <span class="o">&amp;</span> <span class="s2">&quot; &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">zkFilepath</span>
+    <span class="k">end</span> <span class="k">if</span>
+<span class="k">end</span> <span class="nv">openInChoosenApp</span>
+
+<span class="k">on</span> <span class="nb">open location</span> <span class="nv">thisURL</span>
+    <span class="k">set</span> <span class="nv">resouceAndQuery</span> <span class="k">to</span> <span class="nv">removeUrlPrefix</span><span class="p">(</span><span class="nv">thisURL</span><span class="p">)</span>
+    <span class="k">set</span> <span class="nv">idAndOption</span> <span class="k">to</span> <span class="nv">getIdAndOption</span><span class="p">(</span><span class="nv">resouceAndQuery</span><span class="p">)</span>
+    <span class="k">set</span> <span class="nv">zkId</span> <span class="k">to</span> <span class="nb">item</span> <span class="mi">1</span> <span class="k">of</span> <span class="nv">idAndOption</span>
+
+    <span class="k">if</span> <span class="nv">zkId</span> <span class="ow">is</span> <span class="s2">&quot;create&quot;</span> <span class="k">then</span>
+        <span class="nv">createZettel</span><span class="p">()</span>
+        <span class="no">return</span>
+    <span class="k">end</span> <span class="k">if</span>
+
+    <span class="k">set</span> <span class="nv">zkFilepath</span> <span class="k">to</span> <span class="nv">findFilepath</span><span class="p">(</span><span class="nv">zkId</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">item</span> <span class="mi">2</span> <span class="k">of</span> <span class="nv">idAndOption</span> <span class="ow">is</span> <span class="s2">&quot;edit&quot;</span> <span class="k">then</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open -a &quot;</span> <span class="o">&amp;</span> <span class="nv">editApp</span> <span class="o">&amp;</span> <span class="s2">&quot; &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">zkFilepath</span>
+        <span class="c">-- Exit the script immediately so we don&#39;t also open in the default app</span>
+        <span class="no">return</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nb">item</span> <span class="mi">2</span> <span class="k">of</span> <span class="nv">idAndOption</span> <span class="ow">is</span> <span class="s2">&quot;preview&quot;</span> <span class="k">then</span>
+        <span class="nb">do shell script</span> <span class="s2">&quot;open -a &quot;</span> <span class="o">&amp;</span> <span class="nv">previewApp</span> <span class="o">&amp;</span> <span class="s2">&quot; &quot;</span> <span class="o">&amp;</span> <span class="nb">quoted form</span> <span class="k">of</span> <span class="nv">zkFilepath</span>
+        <span class="c">-- Exit the script immediately so we don&#39;t also open in the default app(</span>
+        <span class="no">return</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nb">item</span> <span class="mi">2</span> <span class="k">of</span> <span class="nv">idAndOption</span> <span class="ow">is</span> <span class="s2">&quot;pick&quot;</span> <span class="k">then</span>
+        <span class="nv">openInChoosenApp</span><span class="p">(</span><span class="nv">zkId</span><span class="p">,</span> <span class="nv">zkFilepath</span><span class="p">)</span>
+        <span class="no">return</span>
+    <span class="k">end</span> <span class="k">if</span>
+
+    <span class="c">-- Fall back to the default handler if there was no option</span>
+    <span class="c">-- or the option was invalid</span>
+    <span class="nb">do shell script</span> <span class="s2">&quot;open &quot;</span> <span class="o">&amp;</span> <span class="nv">defaultZkAppUrl</span> <span class="o">&amp;</span> <span class="nv">zkId</span>
+<span class="k">end</span> <span class="nb">open location</span>
+</pre></div>
+    </article>
+</div>
+
+
+        </div>
+
+        <hr id="hr-footer">
+        <footer><span id="left-footer">
+    <a rel="license" href="http://creativecommons.org/licenses/by/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/80x15.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International License</a>.
+</span>
+<span id="right-footer">
+        <a href="https://twitter.com/AlexChabotL">Twitter</a>
+    
+        <a href="https://github.com/achabotl">GitHub</a>
+
+<a href="/feeds/atom.xml">RSS</a>
+</span></footer>
+    </div>
+
+</body>
+</html>

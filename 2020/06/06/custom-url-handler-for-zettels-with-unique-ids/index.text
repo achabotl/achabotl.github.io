@@ -1,0 +1,165 @@
+Title: Custom URL Handler for Zettels with Unique IDs
+Date: 2020-06-06 Saturday
+Author: Alexandre Chabot-Leclerc
+Tags: applescript, zettelkasten
+Status: published
+
+
+Yesterday I read a [series](https://forum.zettelkasten.de/discussion/comment/5609/) [of](https://forum.zettelkasten.de/discussion/1121/open-files-in-any-app-from-the-archive-using-url-schemes) [posts](https://forum.zettelkasten.de/discussion/1152/using-a-custom-url-handler-on-macos-for-any-scripting-purpose) on custom URL scheme handlers on the [Zettelkasten forums](https://forum.zettelkasten.de). The handler registers itself to open links like `zettel://202006061337`, where the number is the unique ID of a zettel (here it's a timestamp). I'm not sure everyone realized the magnitude of what that means. 
+
+Combining a custom URL with a unique ID means notes and links can become _entirely independent from your apps_. Only the handler needs to know about the apps you're using. 
+
+That alone is very nice, but then I thought: URLs can have query parameters… That means I can have URLs like `zettel://202006061337&edit` that open in my text editor of choice: [TextMate](https://macromates.com/), [BBEdit](https://www.barebones.com/products/bbedit), [WriteRoom](http://www.hogbaysoftware.com/products/writeroom), [FoldingText](http://www.foldingtext.com/), etc. Or `zettel://202006061337&preview` to open in [Marked](https://marked2app.com/). Or I could even pick the app interactively with `zettel://202006061337&pick`.
+
+Handling the ID alone is pretty easy since the common Zettelkasten-like apps respond to a URL scheme to search and open files. [The Archive](https://zettelkasten.de/the-archive/help/#how-do-i-link-to-notes-from-other-apps) uses `thearchive://match/ID`, [nvUltra](https://nvultra.com/help/advanced-features#urlhandler) uses `x-nvultra://find/ID`, and [nvAlt](https://brettterpstra.com/2012/02/02/connecting-nvalt-and-address-book/) uses `nvalt://find/ID`.
+
+But how to open in a text editor or in Marked given only the ID? With Spotlight. I used `mdfind -name ID` to find the file. This could be further refined with the `-onlyin FOLDER` option but I didn't need it. Then it's a matter of calling `open -a Marked FILEPATH`.
+
+There's also a `zettel://create` special case that will create a new zettel with the current time stamp (YYYYMMDDHHMM). It's always done with the default Zettelkasten app because the script doesn't know where to write the file but the app does.
+
+I wrote the handler in Applecript because it's the easiest way I know to create something that macOS considers an "app" and that can therefore handle URLs. 
+
+The full script is below. To use it:
+
+1. Open Script Editor and paste the code below in a new file.
+2. [Optional] Modify values in the Configuration section to pick a different URL prefix, default Zettelkasten app URL, editor, and previewer. You can add as many apps as you'd like in the `appChoices` array.
+3. Save as "Application". You can save it anywhere. Make sure [none of the boxes are checked](https://apple.stackexchange.com/questions/245772/how-to-get-rid-of-applescript-confirmation).
+4. Register the app as a URL handler. You can do it with the [SwiftDefaultApps](https://github.com/Lord-Kamina/SwiftDefaultApps) Preference pane, or using the instructions provided by Christian Tietze [in the forums](https://forum.zettelkasten.de/discussion/comment/6133/#Comment_6133):
+	- Locate the application file you just created
+	- Right-click the app, select "Show Package Contents"
+	- Inside, open `Contents/Info.plist` _with a text editor_
+	- Paste the following in a blank line right below the `<dict>` line. Replace `zettel` with the URL prefix you've chosen:
+
+```
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLName</key>
+        <string>Zettel Link Opener</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>zettel</string>
+        </array>
+    </dict>
+</array>
+```
+
+Here's the full script:
+
+```applescript
+-- Zettel Link Opener
+-- Created by Alexandre Chabot-Leclerc
+-- Source: https://alexchabot.net/2020/06/06/custom-url-handler-for-zettels/
+-- URL Handler for zettelkasten unique IDs, e.g., zettel://202006061017
+-- Handles options after the ID to open different apps:
+--    zettel://202006061017&edit to open is a text editor like TextMate
+--    zettel://202006061017&preview to open in a preview app like Marked
+--    zettel://202006061017&pick to open a menu of apps to pick from
+
+-----------------------------------------------------------
+-- CONFIGURATION
+-- URL prefix for your custom URL, e.g. zettel://ZETTEL_ID
+property urlPrefix : "zettel"
+
+-- Default URL to call to open a note with a given ID. The ID will be appended
+property defaultZkAppUrl : "thearchive://match/"
+--property defaultZkAppUrl : "nvalt://find/"
+--property defaultZkAppUrl : "x-nvultra://find/"
+
+-- URL to use to create a new zettle with the current timestamp YYYYMMDDHHMM
+property urlForCreation : "thearchive://matchOrCreate/"
+--property urlForCreation : "nvalt://make?txt="
+--property urlForCreation : "x-nvultra://make?txt="
+
+-- Apps to use for the different query parameters
+property editApp : "FoldingText" -- App to used with "&edit" query parameter
+property previewApp : "Marked" -- App to used with "&preview" query parameter 
+
+-- List of app to display in the menu with with &pick query option
+-- The apps will appear in the order defined here
+property appChoices : {defaultZkAppUrl, editApp, previewApp, "TextMate"}
+property defaultApp : {defaultZkAppUrl})
+-----------------------------------------------------------
+
+on splitText(theText, theDelimiter)
+	set AppleScript's text item delimiters to theDelimiter
+	set theTextItems to every text item of theText
+	set AppleScript's text item delimiters to ""
+	return theTextItems
+end splitText
+
+on removeUrlPrefix(original)
+	-- Remove URL prefix so we're left with only the ID and the optional query parameter
+	return do shell script "echo " & quoted form of original & " | sed 's;" & urlPrefix & "://;;'"
+end removeUrlPrefix
+
+on getIdAndOption(resouceAndQuery)
+	-- Split the zettel ID and the optional parameter
+	-- For example 202006061012&edit or 202006061012&preview
+	set theItems to splitText(resouceAndQuery, "&")
+	if length of theItems is 1 then
+		-- Append an empty string if there's no option so this
+		-- function always returns an array of 2 elements
+		copy "" to the end of theItems
+	end if
+	return theItems
+end getIdAndOption
+
+on findFilepath(zk_id)
+	-- Finds the filepath using Spotlight.
+	-- It's easier than finding the proper filename given only the zettel ID
+	return do shell script "mdfind -name " & zk_id
+end findFilepath
+
+on createZettel()
+	set newZkId to do shell script "date +'%Y%m%d%H%M'"
+	do shell script "open " & urlForCreation & newZkId
+end createZettel
+
+on openInChoosenApp(zkId, zkFilepath)
+	--	From Simple List Handler by Patrick Welker <http://rocketink.net>
+	-- Promp the use for the app to use
+	set selectedApp to item 1 of (choose from list the appChoices with title "Available App" with prompt "Which app do you want to use?" default items defaultApp)
+	if selectedApp is false then
+		-- Exit prematurly if the user clicked Cancel
+		error number -128
+	end if
+	
+	-- Open the URL directly, or open by app name
+	if selectedApp contains "://" then
+		do shell script "open " & selectedApp & zkId
+	else
+		do shell script "open -a " & selectedApp & " " & quoted form of zkFilepath
+	end if
+end openInChoosenApp
+
+on open location thisURL
+	set resouceAndQuery to removeUrlPrefix(thisURL)
+	set idAndOption to getIdAndOption(resouceAndQuery)
+	set zkId to item 1 of idAndOption
+	
+	if zkId is "create" then
+		createZettel()
+		return
+	end if
+	
+	set zkFilepath to findFilepath(zkId)
+	
+	if item 2 of idAndOption is "edit" then
+		do shell script "open -a " & editApp & " " & quoted form of zkFilepath
+		-- Exit the script immediately so we don't also open in the default app
+		return
+	else if item 2 of idAndOption is "preview" then
+		do shell script "open -a " & previewApp & " " & quoted form of zkFilepath
+		-- Exit the script immediately so we don't also open in the default app(
+		return
+	else if item 2 of idAndOption is "pick" then
+		openInChoosenApp(zkId, zkFilepath)
+		return
+	end if
+	
+	-- Fall back to the default handler if there was no option
+	-- or the option was invalid
+	do shell script "open " & defaultZkAppUrl & zkId
+end open location
+```
